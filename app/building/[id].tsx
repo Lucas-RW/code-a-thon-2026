@@ -30,6 +30,7 @@ export default function BuildingDetailScreen() {
   const { user } = useUser();
   const [activeTab, setActiveTab] = React.useState<TabType>("Overview");
   const [interestedMap, setInterestedMap] = React.useState<Record<string, boolean>>({});
+  const [opportunitySkills, setOpportunitySkills] = React.useState<Record<string, string[]>>({});
 
   const [building, setBuilding] = React.useState<BuildingDetail | null>(null);
   const [opportunities, setOpportunities] = React.useState<Opportunity[]>([]);
@@ -69,12 +70,27 @@ export default function BuildingDetailScreen() {
     // Optimistic UI update.
     const nextValue = !interestedMap[oppId];
     setInterestedMap(prev => ({ ...prev, [oppId]: nextValue }));
+    
+    if (!nextValue) {
+      setOpportunitySkills(prev => {
+        const copy = { ...prev };
+        delete copy[oppId];
+        return copy;
+      });
+    }
 
     // Background API call — revert on failure.
     setOpportunityInterest({
       opportunityId: oppId,
       interested: nextValue,
       clerkUserId: user.id,
+    }).then((response) => {
+      if (response.interested && Array.isArray(response.skills)) {
+        setOpportunitySkills(prev => ({
+          ...prev,
+          [oppId]: response.skills,
+        }));
+      }
     }).catch((err) => {
       console.error('[interest] API error:', err);
       // Revert optimistic update.
@@ -84,6 +100,7 @@ export default function BuildingDetailScreen() {
 
   const renderOpportunityCard = ({ item }: { item: Opportunity }) => {
     const isInterested = interestedMap[item.id] || false;
+    const skills = opportunitySkills[item.id];
 
     return (
       <View style={styles.card}>
@@ -105,6 +122,19 @@ export default function BuildingDetailScreen() {
             </View>
           ))}
         </View>
+
+        {isInterested && skills && skills.length > 0 && (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.skillsHeader}>Skills you’ll gain</Text>
+            <View style={styles.skillPillContainer}>
+              {skills.map(skill => (
+                <View key={skill} style={styles.skillPill}>
+                  <Text style={styles.skillPillText}>{skill}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity 
           style={[styles.interestedButton, isInterested && styles.interestedButtonActive]}
@@ -347,6 +377,31 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
     fontSize: 12,
     fontWeight: '500',
+  },
+  skillsHeader: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#cbd5e1',
+    marginBottom: 8,
+  },
+  skillPillContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skillPill: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  skillPillText: {
+    color: '#60a5fa',
+    fontSize: 12,
+    fontWeight: '600',
   },
   interestedButton: {
     borderWidth: 1,

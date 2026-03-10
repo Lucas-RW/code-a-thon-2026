@@ -67,6 +67,13 @@ export async function fetchBuildings(): Promise<BuildingSummary[]> {
   }
 }
 
+export interface InterestResponse {
+  status: string;
+  interested: boolean;
+  opportunity_id: string;
+  skills: string[];
+}
+
 /**
  * Adds or removes an opportunity from the user's interested_opportunities list.
  * Throws on non-2xx or network error.
@@ -75,7 +82,7 @@ export async function setOpportunityInterest(params: {
   opportunityId: string;
   interested: boolean;
   clerkUserId: string;
-}): Promise<void> {
+}): Promise<InterestResponse> {
   const response = await fetch(`${BASE_URL}/interest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -90,6 +97,12 @@ export async function setOpportunityInterest(params: {
     const text = await response.text();
     throw new Error(text || `HTTP ${response.status}`);
   }
+
+  const data = await response.json();
+  return {
+    ...data,
+    skills: Array.isArray(data?.skills) ? data.skills : [],
+  };
 }
 
 export interface BuildingDetail {
