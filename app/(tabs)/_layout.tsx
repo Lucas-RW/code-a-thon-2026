@@ -31,6 +31,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="buildings"
+        options={{
+          title: 'Buildings',
+          href: '/buildings',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="business" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

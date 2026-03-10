@@ -37,3 +37,32 @@ export async function createOrUpdateUserProfile(
     return { ok: false, error: message };
   }
 }
+
+export interface BuildingSummary {
+  id: string;
+  name: string;
+  short_name?: string;
+  lat: number;
+  lng: number;
+  description?: string;
+}
+
+/**
+ * Fetches all buildings from the backend.
+ */
+export async function fetchBuildings(): Promise<BuildingSummary[]> {
+  try {
+    const response = await fetch(`${BASE_URL}/buildings`);
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data as BuildingSummary[];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new Error(`Failed to fetch buildings: ${message}`);
+  }
+}
