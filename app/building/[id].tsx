@@ -8,7 +8,9 @@ import {
   ScrollView 
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
+import { useUser } from '@clerk/clerk-expo';
 import { getMockOpportunitiesForBuilding, Opportunity, OpportunityType } from '@/lib/mockOpportunities';
+import { setOpportunityInterest } from '@/lib/api';
 
 type TabType = "Overview" | "Organizations" | "Research" | "Jobs" | "Professors" | "Events" | "Courses";
 
@@ -24,6 +26,7 @@ const TAB_MAPPING: Record<TabType, OpportunityType | "overview"> = {
 
 export default function BuildingDetailScreen() {
   const { id, name, short_name } = useLocalSearchParams<{ id: string; name: string; short_name: string }>();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = React.useState<TabType>("Overview");
   const [interestedMap, setInterestedMap] = React.useState<Record<string, boolean>>({});
 
@@ -36,10 +39,22 @@ export default function BuildingDetailScreen() {
   }, [activeTab, opportunities]);
 
   const toggleInterest = (oppId: string) => {
-    setInterestedMap(prev => ({
-      ...prev,
-      [oppId]: !prev[oppId]
-    }));
+    if (!user) return;
+
+    // Optimistic UI update.
+    const nextValue = !interestedMap[oppId];
+    setInterestedMap(prev => ({ ...prev, [oppId]: nextValue }));
+
+    // Background API call — revert on failure.
+    setOpportunityInterest({
+      opportunityId: oppId,
+      interested: nextValue,
+      clerkUserId: user.id,
+    }).catch((err) => {
+      console.error('[interest] API error:', err);
+      // Revert optimistic update.
+      setInterestedMap(prev => ({ ...prev, [oppId]: !nextValue }));
+    });
   };
 
   const renderOpportunityCard = ({ item }: { item: Opportunity }) => {
@@ -322,7 +337,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyContainer: {
-    paddingtop: 60,
+    paddingTop: 60,
     alignItems: 'center',
   },
   emptyText: {

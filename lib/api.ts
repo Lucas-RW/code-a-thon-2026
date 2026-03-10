@@ -66,3 +66,28 @@ export async function fetchBuildings(): Promise<BuildingSummary[]> {
     throw new Error(`Failed to fetch buildings: ${message}`);
   }
 }
+
+/**
+ * Adds or removes an opportunity from the user's interested_opportunities list.
+ * Throws on non-2xx or network error.
+ */
+export async function setOpportunityInterest(params: {
+  opportunityId: string;
+  interested: boolean;
+  clerkUserId: string;
+}): Promise<void> {
+  const response = await fetch(`${BASE_URL}/interest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      clerk_user_id: params.clerkUserId,
+      opportunity_id: params.opportunityId,
+      interested: params.interested,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+}

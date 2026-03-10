@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+
 class Building(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
     name: str
@@ -42,3 +43,21 @@ class User(BaseModel):
 
     class Config:
         populate_by_name = True
+
+
+# ── Request schemas for API endpoints ────────────────────────────────────────
+
+class UserCreateOrUpdate(BaseModel):
+    """Payload for POST /users — upserts a user profile."""
+    clerk_user_id: str
+    name: str
+    major: str
+    year: str
+    interests: List[str] = []
+
+
+class InterestRequest(BaseModel):
+    """Payload for POST /interest — toggles opportunity interest."""
+    clerk_user_id: str
+    opportunity_id: str
+    interested: bool
