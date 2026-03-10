@@ -11,6 +11,8 @@ import { ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
 import { fetchBuilding, fetchBuildingOpportunities, BuildingDetail, Opportunity, setOpportunityInterest } from '@/lib/api';
+import LoadingState from '@/components/LoadingState';
+import { useToast } from '@/context/ToastContext';
 
 type TabType = "Overview" | "Organizations" | "Research" | "Jobs" | "Professors" | "Events" | "Courses";
 type OpportunityType = "student_org" | "research" | "job" | "course" | "event" | "professor";
@@ -28,6 +30,7 @@ const TAB_MAPPING: Record<TabType, OpportunityType | "overview"> = {
 export default function BuildingDetailScreen() {
   const { id, name, short_name } = useLocalSearchParams<{ id: string; name: string; short_name: string }>();
   const { user } = useUser();
+  const { showError } = useToast();
   const [activeTab, setActiveTab] = React.useState<TabType>("Overview");
   const [interestedMap, setInterestedMap] = React.useState<Record<string, boolean>>({});
   const [opportunitySkills, setOpportunitySkills] = React.useState<Record<string, string[]>>({});
@@ -48,7 +51,9 @@ export default function BuildingDetailScreen() {
       setBuilding(bldgData);
       setOpportunities(oppsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred.');
+      const msg = err instanceof Error ? err.message : 'Unknown error occurred.';
+      setError(msg);
+      showError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -93,6 +98,7 @@ export default function BuildingDetailScreen() {
       }
     }).catch((err) => {
       console.error('[interest] API error:', err);
+      showError("Couldn't update interest status.");
       // Revert optimistic update.
       setInterestedMap(prev => ({ ...prev, [oppId]: !nextValue }));
     });
@@ -199,7 +205,7 @@ export default function BuildingDetailScreen() {
     return (
       <View style={[styles.container, styles.center]}>
         <Stack.Screen options={{ title: short_name || 'Loading...', headerShown: true }} />
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <LoadingState message="Loading building details..." />
       </View>
     );
   }

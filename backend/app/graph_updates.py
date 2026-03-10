@@ -1,4 +1,7 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def slugify(text: str) -> str:
     """Convert text to a lowercase alphanumeric slug with underscores."""

@@ -4,10 +4,13 @@ import { useUser } from '@clerk/clerk-expo';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { fetchInterestedOpportunities, InterestedOpportunity } from '@/lib/api';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import LoadingState from '@/components/LoadingState';
+import { useToast } from '@/context/ToastContext';
 
 export default function MyOpportunitiesScreen() {
   const { user } = useUser();
   const router = useRouter();
+  const { showError } = useToast();
   const [opportunities, setOpportunities] = React.useState<InterestedOpportunity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -20,7 +23,9 @@ export default function MyOpportunitiesScreen() {
       const data = await fetchInterestedOpportunities(user.id);
       setOpportunities(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load opportunities');
+      const msg = err instanceof Error ? err.message : 'Failed to load opportunities';
+      setError(msg);
+      showError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -83,11 +88,7 @@ export default function MyOpportunitiesScreen() {
   };
 
   if (isLoading && opportunities.length === 0) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-      </View>
-    );
+    return <LoadingState message="Loading your opportunities..." />;
   }
 
   if (error && opportunities.length === 0) {

@@ -4,6 +4,10 @@ from pymongo import ReturnDocument
 from .db import database
 from .utils import serialize_mongo_document
 from .models import UserCreateOrUpdate, InterestRequest
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CampusLens API")
 
@@ -36,7 +40,7 @@ async def get_building(building_id: str):
     try:
         query = {"_id": ObjectId(building_id)}
     except Exception:
-        query = {"_id": building_id}
+        raise HTTPException(status_code=400, detail="Invalid id format")
         
     doc = await buildings_collection.find_one(query)
     if not doc:
@@ -54,17 +58,14 @@ async def get_building_opportunities(building_id: str):
     try:
         bldg_query = {"_id": ObjectId(building_id)}
     except Exception:
-        bldg_query = {"_id": building_id}
+        raise HTTPException(status_code=400, detail="Invalid id format")
         
     bldg_doc = await buildings_collection.find_one(bldg_query)
     if not bldg_doc:
         raise HTTPException(status_code=404, detail="Building not found")
         
-    try:
-        b_obj_id = ObjectId(building_id)
-        opp_query = {"$or": [{"building_id": building_id}, {"building_id": b_obj_id}]}
-    except Exception:
-        opp_query = {"building_id": building_id}
+    b_obj_id = ObjectId(building_id)
+    opp_query = {"$or": [{"building_id": building_id}, {"building_id": b_obj_id}]}
         
     cursor = opportunities_collection.find(opp_query)
     opportunities = []
@@ -109,6 +110,7 @@ async def upsert_user(payload: UserCreateOrUpdate):
         upsert=True,
     )
 
+    logger.info(f"Upserted user profile for clerk_user_id: {payload.clerk_user_id}")
     return {"status": "ok", "clerk_user_id": payload.clerk_user_id}
 
 
@@ -131,6 +133,9 @@ async def toggle_interest(payload: InterestRequest):
     if result is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    action = "marked" if payload.interested else "unmarked"
+    logger.info(f"User {payload.clerk_user_id} {action} interest for opportunity {payload.opportunity_id}")
+
     extracted_skills = []
 
     if payload.interested:
@@ -138,7 +143,6 @@ async def toggle_interest(payload: InterestRequest):
         buildings_collection = database.get_collection("buildings")
         
         from bson import ObjectId
-        import logging
         
         try:
             # Handle both ObjectId strings and plain string IDs gracefully (depending on the seed data setup)
@@ -184,7 +188,7 @@ async def toggle_interest(payload: InterestRequest):
                         }}
                     )
         except Exception as e:
-            logging.error(f"Error updating graphs or calling AI: {e}", exc_info=True)
+            logger.error(f"Error updating graphs or calling AI: {e}", exc_info=True)
 
     count = len(result.get("interested_opportunities", []))
     response_payload = {
@@ -268,4 +272,5 @@ async def get_interested_opportunities(clerk_user_id: str):
             "deadline": s_opp.get("deadline", None)
         })
         
+    logger.info(f"Returned {len(results)} interested opportunities for user {clerk_user_id}")
     return results

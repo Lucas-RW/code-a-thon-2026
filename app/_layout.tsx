@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { tokenCache } from '@/lib/tokenCache';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import AuthGate from '@/components/AuthGate';
+import { ToastProvider } from '@/context/ToastContext';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -18,12 +19,14 @@ export default function RootLayout() {
       <ClerkLoaded>
         <OnboardingProvider>
           <AuthGate>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
-              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
+            <ToastProvider>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="auth" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+            </ToastProvider>
           </AuthGate>
         </OnboardingProvider>
       </ClerkLoaded>

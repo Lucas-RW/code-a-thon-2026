@@ -4,9 +4,12 @@ import { useUser } from '@clerk/clerk-expo';
 import { fetchUserProfile, UserProfile } from '../../lib/api';
 
 import { useFocusEffect } from 'expo-router';
+import LoadingState from '../../components/LoadingState';
+import { useToast } from '../../context/ToastContext';
 
 export default function ProfileScreen() {
   const { user } = useUser();
+  const { showError } = useToast();
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -19,7 +22,9 @@ export default function ProfileScreen() {
       const data = await fetchUserProfile(user.id);
       setProfile(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -42,11 +47,7 @@ export default function ProfileScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
+    return <LoadingState message="Loading profile..." />;
   }
 
   if (error) {
@@ -92,7 +93,7 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Stats</Text>
         <View style={styles.statsContainer}>
           <View style={styles.card}>
-            <Text style={styles.cardValue}>{profile.interested_opportunities.length}</Text>
+            <Text style={styles.cardValue}>{profile.interested_opportunities?.length || 0}</Text>
             <Text style={styles.cardLabel}>Interested Opportunities</Text>
           </View>
           <View style={styles.card}>

@@ -2,9 +2,12 @@ import * as React from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { fetchBuildings, BuildingSummary } from '@/lib/api';
+import LoadingState from '@/components/LoadingState';
+import { useToast } from '@/context/ToastContext';
 
 export default function BuildingsScreen() {
   const router = useRouter();
+  const { showError } = useToast();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -16,7 +19,9 @@ export default function BuildingsScreen() {
       const data = await fetchBuildings();
       setBuildings(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      setError(msg);
+      showError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -49,11 +54,7 @@ export default function BuildingsScreen() {
   );
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
+    return <LoadingState message="Loading buildings..." />;
   }
 
   if (error) {
