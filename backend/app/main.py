@@ -78,5 +78,70 @@ async def toggle_interest(payload: InterestRequest):
     if result is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    extracted_skills = []
+
+    if payload.interested:
+        opportunities_collection = database.get_collection("opportunities")
+        buildings_collection = database.get_collection("buildings")
+        
+        from bson import ObjectId
+        import logging
+        
+        try:
+            # Handle both ObjectId strings and plain string IDs gracefully (depending on the seed data setup)
+            try:
+                opp_id_query = {"_id": ObjectId(payload.opportunity_id)}
+            except Exception:
+                opp_id_query = {"_id": payload.opportunity_id}
+
+            opp_doc = await opportunities_collection.find_one(opp_id_query)
+            
+            if opp_doc:
+                bldg_id = opp_doc.get("building_id")
+                try:
+                    bldg_id_query = {"_id": ObjectId(bldg_id)}
+                except Exception:
+                    bldg_id_query = {"_id": bldg_id}
+                    
+                bldg_doc = await buildings_collection.find_one(bldg_id_query)
+                
+                if bldg_doc:
+                    title = opp_doc.get("title", "")
+                    opp_type = opp_doc.get("type", "")
+                    description = opp_doc.get("description")
+                    departments = bldg_doc.get("departments", [])
+                    department = departments[0] if departments else None
+                    
+                    from .ai_client import extract_skills_for_opportunity
+                    extracted_skills = await extract_skills_for_opportunity(title, opp_type, description, department)
+                    
+                    from .graph_updates import update_skill_graph_for_interest, update_network_graph_for_interest
+                    
+                    user_skill_graph = result.get("skill_graph", {"nodes": [], "edges": []})
+                    user_network_graph = result.get("network_graph", {"nodes": [], "edges": []})
+                    
+                    user_skill_graph = update_skill_graph_for_interest(user_skill_graph, str(opp_doc.get("_id", opp_doc.get("id"))), extracted_skills)
+                    user_network_graph = update_network_graph_for_interest(user_network_graph, bldg_doc, opp_doc)
+                    
+                    await users_collection.update_one(
+                        {"_id": result["_id"]},
+                        {"$set": {
+                            "skill_graph": user_skill_graph,
+                            "network_graph": user_network_graph
+                        }}
+                    )
+        except Exception as e:
+            logging.error(f"Error updating graphs or calling AI: {e}", exc_info=True)
+
     count = len(result.get("interested_opportunities", []))
-    return {"status": "ok", "interested_opportunities_count": count}
+    response_payload = {
+        "status": "ok",
+        "interested": payload.interested,
+        "opportunity_id": payload.opportunity_id,
+        "interested_opportunities_count": count
+    }
+    
+    if payload.interested:
+        response_payload["skills"] = extracted_skills
+
+    return response_payload
