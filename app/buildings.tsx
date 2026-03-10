@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { fetchBuildings, BuildingSummary } from '@/lib/api';
 
 export default function BuildingsScreen() {
+  const router = useRouter();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -26,7 +27,17 @@ export default function BuildingsScreen() {
   }, []);
 
   const renderItem = ({ item }: { item: BuildingSummary }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      onPress={() => router.push({
+        pathname: `/building/${item.id}`,
+        params: { 
+          id: item.id,
+          name: item.name,
+          short_name: item.short_name || ''
+        }
+      })}
+    >
       <Text style={styles.name}>{item.name}</Text>
       {item.short_name && <Text style={styles.shortName}>{item.short_name}</Text>}
       {item.description && (
@@ -34,7 +45,7 @@ export default function BuildingsScreen() {
           {item.description}
         </Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   if (isLoading) {
