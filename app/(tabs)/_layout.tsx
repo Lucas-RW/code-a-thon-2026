@@ -18,7 +18,16 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="send" size={size} color={color} />
+            <MaterialIcons name="explore" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="ar-demo"
+        options={{
+          title: 'AR Demo',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="camera" size={size} color={color} />
           ),
         }}
       />
