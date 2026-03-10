@@ -74,6 +74,14 @@ async def get_building_opportunities(building_id: str):
     return opportunities
 
 
+@app.get("/users/{clerk_user_id}")
+async def get_user(clerk_user_id: str):
+    users_collection = database.get_collection("users")
+    doc = await users_collection.find_one({"clerk_user_id": clerk_user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    return serialize_mongo_document(doc)
+
 @app.post("/users")
 async def upsert_user(payload: UserCreateOrUpdate):
     """Create or update a user profile keyed by clerk_user_id."""

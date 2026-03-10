@@ -143,3 +143,24 @@ export async function fetchBuildingOpportunities(buildingId: string): Promise<Op
     throw new Error(`Failed to fetch building opportunities: ${message}`);
   }
 }
+
+export interface UserProfile {
+  id: string;
+  clerk_user_id: string;
+  name: string;
+  major: string;
+  year: string;
+  interests: string[];
+  interested_opportunities: string[];
+  skill_graph?: any;
+  network_graph?: any;
+}
+
+export async function fetchUserProfile(clerkUserId: string): Promise<UserProfile> {
+  const response = await fetch(`${BASE_URL}/users/${clerkUserId}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+  return await response.json() as UserProfile;
+}
