@@ -164,3 +164,32 @@ export async function fetchUserProfile(clerkUserId: string): Promise<UserProfile
   }
   return await response.json() as UserProfile;
 }
+
+export interface InterestedOpportunity {
+  id: string;
+  building_id: string;
+  building_name: string;
+  building_short_name?: string;
+  type: "student_org" | "research" | "job" | "course" | "event" | "professor";
+  title: string;
+  description?: string;
+  professor?: string | null;
+  tags: string[];
+  contact?: string | null;
+  url?: string | null;
+  deadline?: string | null;
+}
+
+export async function fetchInterestedOpportunities(clerkUserId: string): Promise<InterestedOpportunity[]> {
+  try {
+    const response = await fetch(`${BASE_URL}/users/${clerkUserId}/interested-opportunities`);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    return await response.json() as InterestedOpportunity[];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new Error(`Failed to fetch interested opportunities: ${message}`);
+  }
+}

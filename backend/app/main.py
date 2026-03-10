@@ -198,3 +198,74 @@ async def toggle_interest(payload: InterestRequest):
         response_payload["skills"] = extracted_skills
 
     return response_payload
+
+
+@app.get("/users/{clerk_user_id}/interested-opportunities")
+async def get_interested_opportunities(clerk_user_id: str):
+    users_collection = database.get_collection("users")
+    user_doc = await users_collection.find_one({"clerk_user_id": clerk_user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    interested_ids = user_doc.get("interested_opportunities", [])
+    if not interested_ids:
+        return []
+        
+    opportunities_collection = database.get_collection("opportunities")
+    buildings_collection = database.get_collection("buildings")
+    from bson import ObjectId
+    
+    query_ids = []
+    for oid in interested_ids:
+        try:
+            query_ids.append(ObjectId(oid))
+        except Exception:
+            pass
+        query_ids.append(oid)
+        
+    opp_cursor = opportunities_collection.find({"_id": {"$in": query_ids}})
+    
+    ops = []
+    async for opp in opp_cursor:
+        ops.append(opp)
+        
+    bldg_ids = list(set([opp.get("building_id") for opp in ops if opp.get("building_id")]))
+    bldg_query_ids = []
+    for bid in bldg_ids:
+        try:
+            bldg_query_ids.append(ObjectId(bid))
+        except Exception:
+            pass
+        bldg_query_ids.append(bid)
+        
+    bldgs_cursor = buildings_collection.find({"_id": {"$in": bldg_query_ids}})
+    bldg_map = {}
+    async for bldg in bldgs_cursor:
+        from .utils import serialize_mongo_document
+        s_bldg = serialize_mongo_document(bldg)
+        bldg_map[s_bldg["id"]] = s_bldg
+        bldg_map[str(bldg["_id"])] = s_bldg
+        
+    results = []
+    for opp in ops:
+        from .utils import serialize_mongo_document
+        s_opp = serialize_mongo_document(opp)
+        b_id = s_opp.get("building_id")
+        bldg_info = bldg_map.get(b_id, {})
+        
+        results.append({
+            "id": s_opp.get("id"),
+            "building_id": b_id,
+            "building_name": bldg_info.get("name", "Unknown Building"),
+            "building_short_name": bldg_info.get("short_name", ""),
+            "type": s_opp.get("type", "unknown"),
+            "title": s_opp.get("title", "Untitled"),
+            "description": s_opp.get("description", ""),
+            "professor": s_opp.get("professor", None),
+            "tags": s_opp.get("tags", []),
+            "contact": s_opp.get("contact", None),
+            "url": s_opp.get("url", None),
+            "deadline": s_opp.get("deadline", None)
+        })
+        
+    return results

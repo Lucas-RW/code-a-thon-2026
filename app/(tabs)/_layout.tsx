@@ -50,6 +50,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="my-opportunities"
+        options={{
+          title: 'My Opportunities',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="bookmark" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
