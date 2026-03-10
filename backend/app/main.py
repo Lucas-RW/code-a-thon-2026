@@ -29,6 +29,51 @@ async def get_buildings():
     return buildings
 
 
+@app.get("/buildings/{building_id}")
+async def get_building(building_id: str):
+    buildings_collection = database.get_collection("buildings")
+    from bson import ObjectId
+    try:
+        query = {"_id": ObjectId(building_id)}
+    except Exception:
+        query = {"_id": building_id}
+        
+    doc = await buildings_collection.find_one(query)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Building not found")
+        
+    return serialize_mongo_document(doc)
+
+
+@app.get("/buildings/{building_id}/opportunities")
+async def get_building_opportunities(building_id: str):
+    buildings_collection = database.get_collection("buildings")
+    opportunities_collection = database.get_collection("opportunities")
+    from bson import ObjectId
+    
+    try:
+        bldg_query = {"_id": ObjectId(building_id)}
+    except Exception:
+        bldg_query = {"_id": building_id}
+        
+    bldg_doc = await buildings_collection.find_one(bldg_query)
+    if not bldg_doc:
+        raise HTTPException(status_code=404, detail="Building not found")
+        
+    try:
+        b_obj_id = ObjectId(building_id)
+        opp_query = {"$or": [{"building_id": building_id}, {"building_id": b_obj_id}]}
+    except Exception:
+        opp_query = {"building_id": building_id}
+        
+    cursor = opportunities_collection.find(opp_query)
+    opportunities = []
+    async for doc in cursor:
+        opportunities.append(serialize_mongo_document(doc))
+        
+    return opportunities
+
+
 @app.post("/users")
 async def upsert_user(payload: UserCreateOrUpdate):
     """Create or update a user profile keyed by clerk_user_id."""

@@ -7,12 +7,13 @@ import {
   FlatList, 
   ScrollView 
 } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
-import { getMockOpportunitiesForBuilding, Opportunity, OpportunityType } from '@/lib/mockOpportunities';
-import { setOpportunityInterest } from '@/lib/api';
+import { fetchBuilding, fetchBuildingOpportunities, BuildingDetail, Opportunity, setOpportunityInterest } from '@/lib/api';
 
 type TabType = "Overview" | "Organizations" | "Research" | "Jobs" | "Professors" | "Events" | "Courses";
+type OpportunityType = "student_org" | "research" | "job" | "course" | "event" | "professor";
 
 const TAB_MAPPING: Record<TabType, OpportunityType | "overview"> = {
   "Overview": "overview",
@@ -30,7 +31,31 @@ export default function BuildingDetailScreen() {
   const [activeTab, setActiveTab] = React.useState<TabType>("Overview");
   const [interestedMap, setInterestedMap] = React.useState<Record<string, boolean>>({});
 
-  const opportunities = React.useMemo(() => getMockOpportunitiesForBuilding(name), [name]);
+  const [building, setBuilding] = React.useState<BuildingDetail | null>(null);
+  const [opportunities, setOpportunities] = React.useState<Opportunity[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const loadData = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const [bldgData, oppsData] = await Promise.all([
+        fetchBuilding(id),
+        fetchBuildingOpportunities(id)
+      ]);
+      setBuilding(bldgData);
+      setOpportunities(oppsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredOpportunities = React.useMemo(() => {
     const targetType = TAB_MAPPING[activeTab];
@@ -101,11 +126,25 @@ export default function BuildingDetailScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.overviewContainer}>
-        <Text style={styles.overviewTitle}>About {name}</Text>
-        <Text style={styles.overviewDescription}>
-          This building is a key part of the campus ecosystem, housing various academic departments and research initiatives. 
-          Exploration of this building reveals a wealth of opportunities for students and faculty alike.
-        </Text>
+        <Text style={styles.overviewTitle}>About {building?.name || name}</Text>
+        {building?.description ? (
+          <Text style={styles.overviewDescription}>{building.description}</Text>
+        ) : (
+          <Text style={styles.overviewDescription}>No description available for this building.</Text>
+        )}
+        
+        {building?.departments && building.departments.length > 0 && (
+          <View style={styles.departmentsContainer}>
+            <Text style={styles.sectionHeader}>Departments</Text>
+            <View style={styles.tagContainer}>
+              {building.departments.map(dept => (
+                <View key={dept} style={styles.tag}>
+                  <Text style={styles.tagText}>{dept}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
         
         <View style={styles.statsContainer}>
           <Text style={styles.sectionHeader}>Available Opportunities</Text>
@@ -126,13 +165,34 @@ export default function BuildingDetailScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Stack.Screen options={{ title: short_name || 'Loading...', headerShown: true }} />
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
+
+  if (error || !building) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Stack.Screen options={{ title: 'Error', headerShown: true }} />
+        <Text style={styles.errorText}>{error || 'Building not found'}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: short_name || 'Building Detail', headerShown: true }} />
+      <Stack.Screen options={{ title: building.short_name || short_name || 'Building Detail', headerShown: true }} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>{name}</Text>
-        {short_name && <Text style={styles.subtitle}>{short_name}</Text>}
+        <Text style={styles.title}>{building.name || name}</Text>
+        {(building.short_name || short_name) && <Text style={styles.subtitle}>{building.short_name || short_name}</Text>}
       </View>
 
       <View style={styles.tabBarContainer}>
@@ -172,6 +232,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
   },
   header: {
     padding: 24,
@@ -299,6 +378,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#cbd5e1',
     lineHeight: 24,
+    marginBottom: 24,
+  },
+  departmentsContainer: {
     marginBottom: 24,
   },
   statsContainer: {

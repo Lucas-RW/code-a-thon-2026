@@ -91,3 +91,55 @@ export async function setOpportunityInterest(params: {
     throw new Error(text || `HTTP ${response.status}`);
   }
 }
+
+export interface BuildingDetail {
+  id: string;
+  name: string;
+  short_name?: string;
+  lat: number;
+  lng: number;
+  departments: string[];
+  description?: string;
+  image_url?: string;
+}
+
+export interface Opportunity {
+  id: string;
+  building_id: string;
+  type: "student_org" | "research" | "job" | "course" | "event" | "professor";
+  title: string;
+  description?: string;
+  professor?: string | null;
+  tags: string[];
+  contact?: string | null;
+  url?: string | null;
+  deadline?: string | null;
+}
+
+export async function fetchBuilding(buildingId: string): Promise<BuildingDetail> {
+  try {
+    const response = await fetch(`${BASE_URL}/buildings/${buildingId}`);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    return await response.json() as BuildingDetail;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new Error(`Failed to fetch building details: ${message}`);
+  }
+}
+
+export async function fetchBuildingOpportunities(buildingId: string): Promise<Opportunity[]> {
+  try {
+    const response = await fetch(`${BASE_URL}/buildings/${buildingId}/opportunities`);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    return await response.json() as Opportunity[];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new Error(`Failed to fetch building opportunities: ${message}`);
+  }
+}
