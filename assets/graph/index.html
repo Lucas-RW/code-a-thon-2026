@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>CampusLens Graphs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        #root {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        .graph-container {
+            flex: 1;
+            position: relative;
+            border-bottom: 1px solid #1e293b;
+        }
+        .graph-container:last-child {
+            border-bottom: none;
+        }
+        .graph-title {
+            position: absolute;
+            top: 12px;
+            left: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+            z-index: 10;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .node {
+            stroke: #0f172a;
+            stroke-width: 1.5;
+        }
+        .link {
+            stroke: #334155;
+            stroke-opacity: 0.6;
+        }
+        .label {
+            font-size: 10px;
+            fill: #94a3b8;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="graph-container">
+            <div class="graph-title">Skills Graph</div>
+            <svg id="skills-graph"></svg>
+        </div>
+        <div class="graph-container">
+            <div class="graph-title">Network Graph</div>
+            <svg id="network-graph"></svg>
+        </div>
+    </div>
+    <script src="graph.js"></script>
+</body>
+</html>

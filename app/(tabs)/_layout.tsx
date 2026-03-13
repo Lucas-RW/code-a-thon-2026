@@ -42,11 +42,29 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="golden-path"
+        options={{
+          title: 'Golden Path',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="auto-fix-high" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="person" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="graph"
+        options={{
+          title: 'Graph',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="hub" size={size} color={color} />
           ),
         }}
       />

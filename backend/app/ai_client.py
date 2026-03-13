@@ -75,3 +75,57 @@ Return ONLY a valid JSON array of strings, with no additional text or markdown f
     except Exception as e:
         logger.error(f"Unexpected error calling AI: {e}")
         return []
+
+async def generate_step_reason(
+    user_profile: dict,
+    goal_type: str,
+    goal_text: str | None,
+    opportunity_title: str,
+    building_name: str,
+) -> str:
+    """
+    Generates a personalized reason for a Golden Path step using AI.
+    """
+    if not settings.AI_API_KEY:
+        return f"This {opportunity_title} at {building_name} is a great next step toward your {goal_type} goals."
+
+    # Serialize profile for the prompt
+    profile_summary = (
+        f"Name: {user_profile.get('name', 'N/A')}, "
+        f"Major: {user_profile.get('major', 'N/A')}, "
+        f"Year: {user_profile.get('year', 'N/A')}, "
+        f"Goals: {', '.join(user_profile.get('goals', []))}"
+    )
+    
+    prompt = f"""
+You are helping a UF student plan a path toward {goal_type}.
+Student profile: {profile_summary}.
+Goal text: {goal_text or "not specified"}.
+Recommended step: {opportunity_title} at {building_name}.
+
+In 1–2 sentences, explain why this is a good next step given their background and goal. Be specific and concrete. Return ONLY the explanation string, no markdown.
+    """.strip()
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.AI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": settings.AI_MODEL,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            reason = data["choices"][0]["message"]["content"].strip()
+            return reason
+    except Exception as e:
+        logger.error(f"Error generating AI step reason: {e}")
+        return f"A strong choice to advance your {goal_type} journey at {building_name}."

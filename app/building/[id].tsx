@@ -8,11 +8,33 @@ import {
   ScrollView 
 } from 'react-native';
 import { ActivityIndicator } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { useUser } from '@clerk/clerk-expo';
-import { fetchBuilding, fetchBuildingOpportunities, BuildingDetail, Opportunity, setOpportunityInterest } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { 
+  fetchBuilding, 
+  fetchBuildingOpportunities, 
+  setOpportunityInterest,
+  GoalType,
+  GOAL_OPTIONS,
+  Opportunity
+} from '@/lib/api';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
+
+export interface BuildingDetail {
+  id: string;
+  name: string;
+  short_name?: string;
+  lat: number;
+  lng: number;
+  departments: string[];
+  description?: string;
+  image_url?: string;
+}
+
+// Opportunity interface is now imported from @/lib/api
 
 type TabType = "Overview" | "Organizations" | "Research" | "Jobs" | "Professors" | "Events" | "Courses";
 type OpportunityType = "student_org" | "research" | "job" | "course" | "event" | "professor";
@@ -27,18 +49,42 @@ const TAB_MAPPING: Record<TabType, OpportunityType | "overview"> = {
   "Courses": "course",
 };
 
+const GOAL_PERSIST_KEY = 'campuslens_selected_goal';
+
+const GOAL_MICROCOPY: Record<GoalType, string> = {
+  career: "Focus on opportunities that build career capital.",
+  research: "Highlight opportunities that move you toward research.",
+  academic_aid: "Surface options to strengthen your coursework.",
+  social_support: "Lift up spaces for community and support."
+};
+
 export default function BuildingDetailScreen() {
   const { id, name, short_name } = useLocalSearchParams<{ id: string; name: string; short_name: string }>();
-  const { user } = useUser();
-  const { showError } = useToast();
+  const { accessToken, userProfile } = useAuth();
+  const { showToast, showError } = useToast();
   const [activeTab, setActiveTab] = React.useState<TabType>("Overview");
   const [interestedMap, setInterestedMap] = React.useState<Record<string, boolean>>({});
   const [opportunitySkills, setOpportunitySkills] = React.useState<Record<string, string[]>>({});
-
+  
+  const initialGoal = (userProfile?.goals && userProfile.goals.length > 0) ? userProfile.goals[0] : "all";
+  const [selectedGoal, setSelectedGoal] = React.useState<GoalType | "all">(initialGoal);
   const [building, setBuilding] = React.useState<BuildingDetail | null>(null);
   const [opportunities, setOpportunities] = React.useState<Opportunity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [isFallbackMode, setIsFallbackMode] = React.useState(false);
+
+  // Load persistent goal
+  React.useEffect(() => {
+    SecureStore.getItemAsync(GOAL_PERSIST_KEY).then(val => {
+      if (val) setSelectedGoal(val as GoalType | "all");
+    });
+  }, []);
+
+  const handleGoalChange = (goal: GoalType | "all") => {
+    setSelectedGoal(goal);
+    SecureStore.setItemAsync(GOAL_PERSIST_KEY, goal);
+  };
 
   const loadData = React.useCallback(async () => {
     try {
@@ -53,7 +99,7 @@ export default function BuildingDetailScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error occurred.';
       setError(msg);
-      showError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -65,12 +111,34 @@ export default function BuildingDetailScreen() {
 
   const filteredOpportunities = React.useMemo(() => {
     const targetType = TAB_MAPPING[activeTab];
-    if (targetType === "overview") return [];
-    return opportunities.filter(opt => opt.type === targetType);
-  }, [activeTab, opportunities]);
+    if (targetType === "overview") {
+      setIsFallbackMode(false);
+      return [];
+    }
+    
+    const baseList = opportunities.filter(opt => opt.type === targetType);
+    
+    if (selectedGoal === "all") {
+      setIsFallbackMode(false);
+      return baseList;
+    }
+
+    const filtered = baseList.filter(opp => 
+      opp.goal_tags && opp.goal_tags.includes(selectedGoal)
+    );
+
+    // Fallback logic
+    if (filtered.length === 0 && baseList.length > 0) {
+      setIsFallbackMode(true);
+      return baseList;
+    }
+
+    setIsFallbackMode(false);
+    return filtered;
+  }, [activeTab, opportunities, selectedGoal]);
 
   const toggleInterest = (oppId: string) => {
-    if (!user) return;
+    if (!accessToken) return;
 
     // Optimistic UI update.
     const nextValue = !interestedMap[oppId];
@@ -85,11 +153,7 @@ export default function BuildingDetailScreen() {
     }
 
     // Background API call — revert on failure.
-    setOpportunityInterest({
-      opportunityId: oppId,
-      interested: nextValue,
-      clerkUserId: user.id,
-    }).then((response) => {
+    setOpportunityInterest(oppId, nextValue).then((response) => {
       if (response.interested && Array.isArray(response.skills)) {
         setOpportunitySkills(prev => ({
           ...prev,
@@ -98,7 +162,7 @@ export default function BuildingDetailScreen() {
       }
     }).catch((err) => {
       console.error('[interest] API error:', err);
-      showError("Couldn't update interest status.");
+      showToast("Couldn't update interest status.", 'error');
       // Revert optimistic update.
       setInterestedMap(prev => ({ ...prev, [oppId]: !nextValue }));
     });
@@ -122,7 +186,7 @@ export default function BuildingDetailScreen() {
         )}
 
         <View style={styles.tagContainer}>
-          {item.tags.map(tag => (
+          {item.tags.map((tag: string) => (
             <View key={tag} style={styles.tag}>
               <Text style={styles.tagText}>{tag}</Text>
             </View>
@@ -173,7 +237,7 @@ export default function BuildingDetailScreen() {
           <View style={styles.departmentsContainer}>
             <Text style={styles.sectionHeader}>Departments</Text>
             <View style={styles.tagContainer}>
-              {building.departments.map(dept => (
+              {building.departments.map((dept: string) => (
                 <View key={dept} style={styles.tag}>
                   <Text style={styles.tagText}>{dept}</Text>
                 </View>
@@ -245,20 +309,57 @@ export default function BuildingDetailScreen() {
         </ScrollView>
       </View>
 
+      {activeTab !== "Overview" && (
+        <View style={styles.goalSelectorContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.goalSelector}>
+            <TouchableOpacity 
+              style={[styles.goalChip, selectedGoal === "all" && styles.activeGoalChip]}
+              onPress={() => handleGoalChange("all")}
+            >
+              <Text style={[styles.goalChipText, selectedGoal === "all" && styles.activeGoalChipText]}>All Goals</Text>
+            </TouchableOpacity>
+            {GOAL_OPTIONS.map((goal) => (
+              <TouchableOpacity 
+                key={goal.id} 
+                style={[styles.goalChip, selectedGoal === goal.id && styles.activeGoalChip]}
+                onPress={() => handleGoalChange(goal.id)}
+              >
+                <Text style={[styles.goalChipText, selectedGoal === goal.id && styles.activeGoalChipText]}>{goal.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {selectedGoal !== "all" && (
+            <Text style={styles.goalMicrocopy}>
+              {GOAL_MICROCOPY[selectedGoal]}
+            </Text>
+          )}
+        </View>
+      )}
+
       {activeTab === "Overview" ? (
         renderOverview()
       ) : (
-        <FlatList
-          data={filteredOpportunities}
-          keyExtractor={(item) => item.id}
-          renderItem={renderOpportunityCard}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No {activeTab.toLowerCase()} found for this building.</Text>
+        <>
+          {isFallbackMode && (
+            <View style={styles.fallbackNote}>
+              <MaterialIcons name="info-outline" size={14} color="#94a3b8" />
+              <Text style={styles.fallbackNoteText}>
+                No items tagged for this goal yet. Showing all {activeTab.toLowerCase()} instead.
+              </Text>
             </View>
-          }
-        />
+          )}
+          <FlatList
+            data={filteredOpportunities}
+            keyExtractor={(item) => item.id}
+            renderItem={renderOpportunityCard}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No {activeTab.toLowerCase()} found for this building.</Text>
+              </View>
+            }
+          />
+        </>
       )}
     </View>
   );
@@ -341,10 +442,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
   },
   cardHeader: {
     marginBottom: 8,
@@ -487,5 +585,58 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 16,
     textAlign: 'center',
+  },
+  goalSelectorContainer: {
+    backgroundColor: '#0f172a',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  goalSelector: {
+    paddingHorizontal: 16,
+  },
+  goalChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  activeGoalChip: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: '#3b82f6',
+  },
+  goalChipText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  activeGoalChipText: {
+    color: '#3b82f6',
+  },
+  goalMicrocopy: {
+    fontSize: 12,
+    color: '#64748b',
+    paddingHorizontal: 20,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  fallbackNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    margin: 16,
+    marginBottom: 0,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  fallbackNoteText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginLeft: 6,
   },
 });
