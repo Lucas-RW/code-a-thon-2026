@@ -9,7 +9,9 @@ from .db import database
 from .utils import serialize_mongo_document
 from .models import (
     User, UserAuth, AuthRegister, AuthLogin, Token, UserUpdate, InterestRequest,
-    PathfindRequest, PathfindResponse, PathStep
+    PathfindRequest, PathfindResponse, PathStep,
+    AIBootstrapBuildingRequest, AIBootstrapBuildingResponse,
+    SaveAIBootstrapRequest, Building, Opportunity,
 )
 from .auth import (
     get_password_hash, verify_password, create_access_token, get_current_user_profile
@@ -476,3 +478,106 @@ def get_static_fallback_path(goal_type: str) -> list[PathStep]:
             cta_url="/building/cse"
         )
     ]
+
+
+# ── AI Bootstrap Endpoints ──────────────────────────────────────────────────
+
+@app.post("/buildings/ai-bootstrap", response_model=AIBootstrapBuildingResponse)
+async def ai_bootstrap_building(
+    payload: AIBootstrapBuildingRequest,
+    current_user: dict = Depends(get_current_user_profile),
+):
+    """
+    Use AI to propose a building + opportunities for a campus.
+    Does NOT write to Mongo; caller can inspect and decide to save.
+    """
+    from .ai_client import ai_generate_building_and_opportunities
+    try:
+        result = await ai_generate_building_and_opportunities(payload)
+        return result
+    except Exception as e:
+        logger.error(f"AI bootstrap failed: {e}")
+        # Fallback: simple generic building + 1 opportunity
+        fallback_building = Building(
+            name=payload.building_name,
+            short_name=payload.building_name,
+            lat=0.0,
+            lng=0.0,
+            departments=[],
+            description=f"{payload.building_name} at {payload.campus_name}.",
+            source="ai_fallback",
+            confidence=0.3,
+        )
+        from .models import AIBootstrapOpportunity
+        fallback_opp = AIBootstrapOpportunity(
+            title=f"Explore {payload.building_name}",
+            description="General academic and student resources.",
+            type="general",
+            goal_tags=["career"],
+            contact=None,
+            url=payload.building_url,
+        )
+        return AIBootstrapBuildingResponse(
+            building=fallback_building,
+            opportunities=[fallback_opp],
+            source="ai_fallback",
+            confidence=0.3,
+        )
+
+@app.post("/buildings/ai-bootstrap/save")
+async def save_ai_bootstrap(
+    payload: SaveAIBootstrapRequest,
+    current_user: dict = Depends(get_current_user_profile),
+):
+    """
+    Persist an AI-generated building + opportunities into Mongo.
+    """
+    buildings_col = database.get_collection("buildings")
+    opps_col = database.get_collection("opportunities")
+
+    # 1. Upsert building
+    existing = await buildings_col.find_one({"name": payload.building.name})
+    if existing:
+        building_id = existing["_id"]
+    else:
+        building_doc = {
+            "name": payload.building.name,
+            "short_name": payload.building.short_name or payload.building.name,
+            "lat": payload.building.lat,
+            "lng": payload.building.lng,
+            "departments": payload.building.departments or [],
+            "description": payload.building.description,
+            "image_url": payload.building.image_url,
+            "source": payload.building.source or "ai_generated",
+            "confidence": payload.building.confidence or 0.7,
+        }
+        result = await buildings_col.insert_one(building_doc)
+        building_id = result.inserted_id
+
+    # 2. Insert opportunities
+    opp_docs = []
+    for o in payload.opportunities:
+        opp_docs.append(
+            {
+                "building_id": str(building_id),
+                "type": o.type,
+                "title": o.title,
+                "description": o.description,
+                "tags": [],
+                "goal_tags": o.goal_tags,
+                "contact": o.contact,
+                "url": o.url,
+                "deadline": None,
+                "source": "ai_generated",
+                "confidence": 0.7,
+            }
+        )
+
+    if opp_docs:
+        await opps_col.insert_many(opp_docs)
+
+    return {
+        "status": "ok", 
+        "building_id": str(building_id), 
+        "inserted_opportunities": len(opp_docs)
+    }

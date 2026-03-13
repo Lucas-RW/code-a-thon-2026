@@ -227,3 +227,67 @@ export async function fetchPathfind(params: { goal_type: GoalType; goal_text?: s
   if (!response.ok) throw new Error('Failed to generate path');
   return await response.json();
 }
+
+export interface AIBootstrapBuildingRequest {
+  campus_name: string;
+  building_name: string;
+  building_url?: string;
+}
+
+export interface AIBootstrapOpportunity {
+  title: string;
+  description: string;
+  type: string;
+  goal_tags: GoalType[];
+  contact?: string | null;
+  url?: string | null;
+}
+
+export interface AIBootstrapBuildingResponse {
+  building: {
+    name: string;
+    short_name: string;
+    description: string;
+    departments: string[];
+    image_url: string | null;
+    lat: number;
+    lng: number;
+    source: string;
+    confidence: number;
+  };
+  opportunities: AIBootstrapOpportunity[];
+  source: string;
+  confidence: number;
+}
+
+export interface SaveAIBootstrapRequest {
+  building: any; // Using any to be flexible with the Building type
+  opportunities: AIBootstrapOpportunity[];
+}
+
+export async function aiBootstrapBuilding(
+  payload: AIBootstrapBuildingRequest
+): Promise<AIBootstrapBuildingResponse> {
+  const res = await fetchWithAuth("/buildings/ai-bootstrap", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to bootstrap building");
+  }
+  return res.json();
+}
+
+export async function saveAIBootstrap(
+  payload: SaveAIBootstrapRequest
+): Promise<{ status: string; building_id: string; inserted_opportunities: number }>
+{
+  const res = await fetchWithAuth("/buildings/ai-bootstrap/save", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to save AI bootstrap");
+  }
+  return res.json();
+}

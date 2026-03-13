@@ -13,6 +13,8 @@ class Building(BaseModel):
     departments: List[str]
     description: Optional[str] = None
     image_url: Optional[str] = None
+    source: Optional[str] = None           # e.g. "manual" | "ai_generated" | "ai_fallback"
+    confidence: Optional[float] = None
 
     class Config:
         populate_by_name = True
@@ -29,6 +31,8 @@ class Opportunity(BaseModel):
     url: Optional[str] = None
     deadline: Optional[str] = None
     goal_tags: Optional[List[GoalType]] = None
+    source: Optional[str] = None
+    confidence: Optional[float] = None
 
     class Config:
         populate_by_name = True
@@ -117,3 +121,29 @@ class PathStep(BaseModel):
 
 class PathfindResponse(BaseModel):
     steps: List[PathStep]
+
+
+# ── AI Bootstrap schemas ─────────────────────────────────────────────────────
+
+class AIBootstrapBuildingRequest(BaseModel):
+    campus_name: str
+    building_name: str
+    building_url: Optional[str] = None
+
+class AIBootstrapOpportunity(BaseModel):
+    title: str
+    description: str
+    type: str  # "club" | "research" | "course" | "event" | "general"
+    goal_tags: List[GoalType] = []
+    contact: Optional[str] = None
+    url: Optional[str] = None
+
+class AIBootstrapBuildingResponse(BaseModel):
+    building: Building
+    opportunities: List[AIBootstrapOpportunity]
+    source: str = "ai_generated"
+    confidence: float = 0.7
+
+class SaveAIBootstrapRequest(BaseModel):
+    building: Building
+    opportunities: List[AIBootstrapOpportunity]

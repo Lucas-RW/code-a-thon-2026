@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import LoadingState from '@/components/LoadingState';
 
 export default function ProfileScreen() {
   const { userProfile, refreshProfile, logout, isLoading } = useAuth();
+  const router = useRouter();
 
   useFocusEffect(
     React.useCallback(() => {
@@ -29,9 +30,15 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
-          </View>
+          <TouchableOpacity 
+            onLongPress={() => router.push('/dev/ai-bootstrap' as any)}
+            delayLongPress={2000}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
+            </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{userProfile.name}</Text>
           <Text style={styles.subtitle}>{userProfile.major} • {userProfile.year}</Text>
         </View>
