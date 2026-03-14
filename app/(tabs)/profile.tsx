@@ -1,218 +1,199 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
-import { fetchUserProfile, UserProfile } from '../../lib/api';
-
-import { useFocusEffect } from 'expo-router';
-import LoadingState from '../../components/LoadingState';
-import { useToast } from '../../context/ToastContext';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
+import { useFocusEffect, useRouter } from 'expo-router';
+import LoadingState from '@/components/LoadingState';
 
 export default function ProfileScreen() {
-  const { user } = useUser();
-  const { showError } = useToast();
-  const [profile, setProfile] = React.useState<UserProfile | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const loadProfile = React.useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchUserProfile(user.id);
-      setProfile(data);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError(msg);
-      showError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+  const { userProfile, refreshProfile, logout, isLoading } = useAuth();
+  const router = useRouter();
 
   useFocusEffect(
     React.useCallback(() => {
-      if (user?.id) {
-        loadProfile();
-      }
-    }, [user?.id, loadProfile])
+      refreshProfile();
+    }, [])
   );
 
-  if (!user) {
-    return (
-      <View style={styles.center}>
-        <Text>Please sign in to view your profile.</Text>
-      </View>
-    );
-  }
-
-  if (loading) {
+  if (isLoading && !userProfile) {
     return <LoadingState message="Loading profile..." />;
   }
 
-  if (error) {
+  if (!userProfile) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>Error loading profile: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadProfile}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.errorText}>No profile found.</Text>
       </View>
     );
   }
 
-  if (!profile) {
-    return null;
-  }
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <Text style={styles.name}>{profile.name}</Text>
-        <Text style={styles.subtitle}>{profile.major} • {profile.year}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Interests</Text>
-        <View style={styles.chipsContainer}>
-          {profile.interests.map((interest, idx) => (
-            <View key={idx} style={styles.chip}>
-              <Text style={styles.chipText}>{interest}</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onLongPress={() => router.push('/dev/ai-bootstrap' as any)}
+            delayLongPress={2000}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
             </View>
-          ))}
-          {profile.interests.length === 0 && (
-            <Text style={styles.emptyText}>No interests listed</Text>
-          )}
+          </TouchableOpacity>
+          <Text style={styles.name}>{userProfile.name}</Text>
+          <Text style={styles.subtitle}>{userProfile.major} • {userProfile.year}</Text>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Stats</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.card}>
-            <Text style={styles.cardValue}>{profile.interested_opportunities?.length || 0}</Text>
-            <Text style={styles.cardLabel}>Interested Opportunities</Text>
-          </View>
-          <View style={styles.card}>
-            <Text style={styles.cardValue}>0</Text>
-            <Text style={styles.cardLabel}>Skills Learned</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Goals</Text>
+          <View style={styles.goalsContainer}>
+            {userProfile.goals.map((goal, idx) => (
+              <View key={idx} style={styles.goalChip}>
+                <Text style={styles.goalChipText}>{goal.replace('_', ' ').toUpperCase()}</Text>
+              </View>
+            ))}
+            {userProfile.goals.length === 0 && (
+              <Text style={styles.emptyText}>No goals set yet</Text>
+            )}
           </View>
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Stats</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{userProfile.interested_opportunities?.length || 0}</Text>
+              <Text style={styles.statLabel}>Interests</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statLabel}>Skills</Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scrollContent: {
+    padding: 24,
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#000',
   },
   header: {
-    padding: 32,
-    backgroundColor: '#f8f9fa',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     alignItems: 'center',
+    marginVertical: 40,
   },
   avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007bff',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatarText: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
+    color: '#000',
+    fontSize: 42,
+    fontWeight: '800',
   },
   name: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#888',
+    fontWeight: '600',
   },
   section: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#fff',
     marginBottom: 16,
-    color: '#333',
+    letterSpacing: 0.5,
   },
-  chipsContainer: {
+  goalsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  chip: {
-    backgroundColor: '#e9ecef',
+  goalChip: {
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#333',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  chipText: {
-    color: '#495057',
-    fontSize: 14,
-    fontWeight: '500',
+  goalChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   emptyText: {
-    color: '#999',
+    color: '#444',
     fontStyle: 'italic',
   },
-  statsContainer: {
+  statsRow: {
+    flexDirection: 'row',
     gap: 12,
   },
-  card: {
-    backgroundColor: '#f8f9fa',
+  statCard: {
+    flex: 1,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
     padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  logoutButton: {
+    marginTop: 20,
+    padding: 18,
     borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: '#111',
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#333',
   },
-  cardValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#007bff',
-  },
-  cardLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+  logoutText: {
+    color: '#ff4444',
+    fontSize: 16,
+    fontWeight: '700',
   },
   errorText: {
-    color: '#dc3545',
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  retryButton: {
-    backgroundColor: '#007bff',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
+    color: '#fff',
   },
 });

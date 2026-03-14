@@ -1,36 +1,52 @@
 import * as React from 'react';
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { tokenCache } from '@/lib/tokenCache';
-import { OnboardingProvider } from '@/context/OnboardingContext';
-import AuthGate from '@/components/AuthGate';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { ActivityIndicator, View } from 'react-native';
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+import { GraphProvider } from '@/context/GraphContext';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+function NavigationGuard({ children }: { children: React.ReactNode }) {
+  const { accessToken, userProfile, isLoading, isProfileComplete } = useAuth();
+
+  React.useEffect(() => {
+    if (isLoading) return;
+
+    if (!accessToken) {
+      router.replace('/auth/login' as any);
+    } else if (userProfile && !isProfileComplete) {
+      router.replace('/profile-builder/step1-basics' as any);
+    }
+  }, [accessToken, isLoading, userProfile, isProfileComplete]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <OnboardingProvider>
-          <AuthGate>
-            <ToastProvider>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-            </ToastProvider>
-          </AuthGate>
-        </OnboardingProvider>
-      </ClerkLoaded>
+    <AuthProvider>
+      <ToastProvider>
+        <GraphProvider>
+          <NavigationGuard>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="auth" />
+              <Stack.Screen name="profile-builder" />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </NavigationGuard>
+        </GraphProvider>
+      </ToastProvider>
       <StatusBar style="light" />
-    </ClerkProvider>
+    </AuthProvider>
   );
 }

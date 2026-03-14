@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 
 interface ToastProps {
   message: string;
-  type?: 'error' | 'info';
+  type?: 'error' | 'info' | 'success';
   visible: boolean;
   onHide: () => void;
 }
@@ -45,7 +45,7 @@ export default function Toast({ message, type = 'error', visible, onHide }: Toas
     <Animated.View style={[
       styles.container, 
       { transform: [{ translateY }] }, 
-      type === 'error' ? styles.error : styles.info
+      type === 'error' ? styles.error : type === 'success' ? styles.success : styles.info
     ]}>
       <Text style={styles.message}>{message}</Text>
       <TouchableOpacity onPress={hide} style={styles.closeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -68,16 +68,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 9999,
     elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    boxShadow: '0px 4px 5px rgba(0, 0, 0, 0.3)',
   },
   error: {
     backgroundColor: '#ef4444',
   },
   info: {
     backgroundColor: '#3b82f6',
+  },
+  success: {
+    backgroundColor: '#10b981',
   },
   message: {
     color: '#fff',

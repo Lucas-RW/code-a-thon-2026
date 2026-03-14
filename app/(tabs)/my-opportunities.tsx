@@ -1,35 +1,81 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { fetchInterestedOpportunities, InterestedOpportunity } from '@/lib/api';
+import { fetchInterestedOpportunities, InterestedOpportunity, GoalType, GOAL_OPTIONS } from '@/lib/api';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
 
+const GOAL_PERSIST_KEY = 'campuslens_selected_goal';
+
+const GOAL_MICROCOPY: Record<GoalType, string> = {
+  career: "Focus on opportunities that build career capital.",
+  research: "Highlight opportunities that move you toward research.",
+  academic_aid: "Surface options to strengthen your coursework.",
+  social_support: "Lift up spaces for community and support."
+};
+
 export default function MyOpportunitiesScreen() {
-  const { user } = useUser();
+  const { accessToken, userProfile } = useAuth();
   const router = useRouter();
-  const { showError } = useToast();
+  const { showToast } = useToast();
+  
+  const initialGoal = (userProfile?.goals && userProfile.goals.length > 0) ? userProfile.goals[0] : "all";
   const [opportunities, setOpportunities] = React.useState<InterestedOpportunity[]>([]);
+  const [selectedGoal, setSelectedGoal] = React.useState<GoalType | "all">(initialGoal);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [isFallbackMode, setIsFallbackMode] = React.useState(false);
+
+  // Load persistent goal
+  React.useEffect(() => {
+    SecureStore.getItemAsync(GOAL_PERSIST_KEY).then(val => {
+      if (val) setSelectedGoal(val as GoalType | "all");
+    });
+  }, []);
+
+  const handleGoalChange = (goal: GoalType | "all") => {
+    setSelectedGoal(goal);
+    SecureStore.setItemAsync(GOAL_PERSIST_KEY, goal);
+  };
 
   const loadOpportunities = React.useCallback(async () => {
-    if (!user) return;
+    if (!accessToken) return;
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchInterestedOpportunities(user.id);
+      const data = await fetchInterestedOpportunities();
       setOpportunities(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load opportunities';
       setError(msg);
-      showError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [accessToken]);
+
+  const filteredOpportunities = React.useMemo(() => {
+    if (selectedGoal === "all") {
+      setIsFallbackMode(false);
+      return opportunities;
+    }
+
+    const filtered = opportunities.filter(opp => 
+      opp.goal_tags && opp.goal_tags.includes(selectedGoal)
+    );
+
+    // Fallback logic
+    if (filtered.length === 0 && opportunities.length > 0) {
+      setIsFallbackMode(true);
+      return opportunities;
+    }
+
+    setIsFallbackMode(false);
+    return filtered;
+  }, [opportunities, selectedGoal]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -62,7 +108,7 @@ export default function MyOpportunitiesScreen() {
 
         {item.tags && item.tags.length > 0 && (
           <View style={styles.tagContainer}>
-            {item.tags.map(tag => (
+            {item.tags.map((tag: string) => (
               <View key={tag} style={styles.tag}>
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
@@ -109,8 +155,42 @@ export default function MyOpportunitiesScreen() {
         <Text style={styles.subtitle}>{opportunities.length} marked as interested</Text>
       </View>
 
+      <View style={styles.goalSelectorContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.goalSelector}>
+          <TouchableOpacity 
+            style={[styles.goalChip, selectedGoal === "all" && styles.activeGoalChip]}
+            onPress={() => handleGoalChange("all")}
+          >
+            <Text style={[styles.goalChipText, selectedGoal === "all" && styles.activeGoalChipText]}>All Goals</Text>
+          </TouchableOpacity>
+          {GOAL_OPTIONS.map((goal) => (
+            <TouchableOpacity 
+              key={goal.id} 
+              style={[styles.goalChip, selectedGoal === goal.id && styles.activeGoalChip]}
+              onPress={() => handleGoalChange(goal.id)}
+            >
+              <Text style={[styles.goalChipText, selectedGoal === goal.id && styles.activeGoalChipText]}>{goal.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {selectedGoal !== "all" && (
+          <Text style={styles.goalMicrocopy}>
+            {GOAL_MICROCOPY[selectedGoal]}
+          </Text>
+        )}
+      </View>
+
+      {isFallbackMode && (
+        <View style={styles.fallbackNote}>
+          <MaterialIcons name="info-outline" size={14} color="#94a3b8" />
+          <Text style={styles.fallbackNoteText}>
+            No items tagged for this goal yet. Showing all interests instead.
+          </Text>
+        </View>
+      )}
+
       <FlatList
-        data={opportunities}
+        data={filteredOpportunities}
         keyExtractor={(item) => item.id}
         renderItem={renderOpportunityCard}
         contentContainerStyle={styles.listContent}
@@ -133,7 +213,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', color: '#f8fafc', marginBottom: 4 },
   subtitle: { fontSize: 16, color: '#94a3b8' },
   listContent: { padding: 16, paddingBottom: 40 },
-  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#334155', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#334155', elevation: 2, boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#f1f5f9', flex: 1, marginRight: 8 },
   badgeContainer: { backgroundColor: '#3b82f620', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f650', alignSelf: 'flex-start' },
@@ -151,4 +231,57 @@ const styles = StyleSheet.create({
   retryButtonText: { color: '#ffffff', fontWeight: 'bold' },
   emptyContainer: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 32 },
   emptyText: { color: '#64748b', fontSize: 16, textAlign: 'center', lineHeight: 24 },
+  goalSelectorContainer: {
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  goalSelector: {
+    paddingHorizontal: 24,
+  },
+  goalChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  activeGoalChip: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: '#3b82f6',
+  },
+  goalChipText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeGoalChipText: {
+    color: '#3b82f6',
+  },
+  goalMicrocopy: {
+    fontSize: 12,
+    color: '#64748b',
+    paddingHorizontal: 24,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  fallbackNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    margin: 16,
+    marginBottom: 0,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  fallbackNoteText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginLeft: 6,
+  },
 });

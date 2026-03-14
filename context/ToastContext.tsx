@@ -4,6 +4,8 @@ import Toast from '../components/Toast';
 interface ToastContextType {
   showError: (message: string) => void;
   showInfo: (message: string) => void;
+  showSuccess: (message: string) => void;
+  showToast: (message: string, type?: 'error' | 'info' | 'success') => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -11,26 +13,24 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
-  const [type, setType] = useState<'error' | 'info'>('info');
+  const [type, setType] = useState<'error' | 'info' | 'success'>('info');
 
-  const showError = (msg: string) => {
+  const showToast = (msg: string, t: 'error' | 'info' | 'success' = 'info') => {
     setMessage(msg);
-    setType('error');
+    setType(t);
     setVisible(true);
   };
 
-  const showInfo = (msg: string) => {
-    setMessage(msg);
-    setType('info');
-    setVisible(true);
-  };
+  const showError = (msg: string) => showToast(msg, 'error');
+  const showInfo = (msg: string) => showToast(msg, 'info');
+  const showSuccess = (msg: string) => showToast(msg, 'success');
 
   const hide = () => {
     setVisible(false);
   };
 
   return (
-    <ToastContext.Provider value={{ showError, showInfo }}>
+    <ToastContext.Provider value={{ showError, showInfo, showSuccess, showToast }}>
       {children}
       <Toast visible={visible} message={message} type={type} onHide={hide} />
     </ToastContext.Provider>

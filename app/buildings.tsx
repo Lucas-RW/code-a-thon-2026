@@ -7,7 +7,7 @@ import { useToast } from '@/context/ToastContext';
 
 export default function BuildingsScreen() {
   const router = useRouter();
-  const { showError } = useToast();
+  const { showToast } = useToast();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -21,7 +21,7 @@ export default function BuildingsScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       setError(msg);
-      showError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -35,7 +35,7 @@ export default function BuildingsScreen() {
     <TouchableOpacity 
       style={styles.card}
       onPress={() => router.push({
-        pathname: `/building/${item.id}`,
+        pathname: "/building/[id]",
         params: { 
           id: item.id,
           name: item.name,
