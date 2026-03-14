@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { getItem } from '@/lib/storage';
 import * as Api from '@/lib/api';
 
 const TOKEN_KEY = 'campuslens_access_token';
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadAuth() {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await getItem(TOKEN_KEY);
       if (token) {
         setAccessToken(token);
         // We'll fetch the profile in a separate effect or after setting token
@@ -61,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await Api.login(email, password);
     if (result.ok && result.data) {
       setAccessToken(result.data.access_token);
+      setIsLoading(false);
     } else {
       setIsLoading(false);
       throw new Error(result.error || 'Login failed');
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await Api.register(email, password);
     if (result.ok && result.data) {
       setAccessToken(result.data.access_token);
+      setIsLoading(false);
     } else {
       setIsLoading(false);
       throw new Error(result.error || 'Registration failed');

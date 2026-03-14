@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem } from '@/lib/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { fetchInterestedOpportunities, InterestedOpportunity, GoalType, GOAL_OPTIONS } from '@/lib/api';
@@ -31,14 +31,14 @@ export default function MyOpportunitiesScreen() {
 
   // Load persistent goal
   React.useEffect(() => {
-    SecureStore.getItemAsync(GOAL_PERSIST_KEY).then(val => {
+    getItem(GOAL_PERSIST_KEY).then(val => {
       if (val) setSelectedGoal(val as GoalType | "all");
     });
   }, []);
 
   const handleGoalChange = (goal: GoalType | "all") => {
     setSelectedGoal(goal);
-    SecureStore.setItemAsync(GOAL_PERSIST_KEY, goal);
+    setItem(GOAL_PERSIST_KEY, goal);
   };
 
   const loadOpportunities = React.useCallback(async () => {
