@@ -8,7 +8,7 @@ import {
   ScrollView 
 } from 'react-native';
 import { ActivityIndicator } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem } from '@/lib/storage';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -76,14 +76,14 @@ export default function BuildingDetailScreen() {
 
   // Load persistent goal
   React.useEffect(() => {
-    SecureStore.getItemAsync(GOAL_PERSIST_KEY).then(val => {
+    getItem(GOAL_PERSIST_KEY).then(val => {
       if (val) setSelectedGoal(val as GoalType | "all");
     });
   }, []);
 
   const handleGoalChange = (goal: GoalType | "all") => {
     setSelectedGoal(goal);
-    SecureStore.setItemAsync(GOAL_PERSIST_KEY, goal);
+    setItem(GOAL_PERSIST_KEY, goal);
   };
 
   const loadData = React.useCallback(async () => {

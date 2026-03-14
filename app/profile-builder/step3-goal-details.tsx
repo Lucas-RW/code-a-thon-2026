@@ -27,7 +27,7 @@ export default function Step3GoalDetails() {
       });
       await refreshProfile();
       showToast('Profile completed!', 'success');
-      // Navigation is handled by NavigationGuard in _layout
+      router.replace('/(tabs)' as any);
     } catch (err: any) {
       showToast(err.message || 'Failed to save profile', 'error');
     } finally {

@@ -1,10 +1,10 @@
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem, deleteItem } from './storage';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 const TOKEN_KEY = 'campuslens_access_token';
 
 async function getAuthHeader() {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  const token = await getItem(TOKEN_KEY);
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
@@ -29,7 +29,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
   if (response.status === 401) {
     // Handle unauthorized (token expired/invalid)
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await deleteItem(TOKEN_KEY);
     // You might want to trigger a logout/redirect here via a global event or context
   }
 
@@ -79,7 +79,7 @@ export async function login(email: string, password: string): Promise<ApiResult<
     }
 
     const data = await response.json();
-    await SecureStore.setItemAsync(TOKEN_KEY, data.access_token);
+    await setItem(TOKEN_KEY, data.access_token);
     return { ok: true, data };
   } catch (err) {
     return { ok: false, error: 'Network error' };
@@ -100,7 +100,7 @@ export async function register(email: string, password: string): Promise<ApiResu
     }
 
     const data = await response.json();
-    await SecureStore.setItemAsync(TOKEN_KEY, data.access_token);
+    await setItem(TOKEN_KEY, data.access_token);
     return { ok: true, data };
   } catch (err) {
     return { ok: false, error: 'Network error' };
@@ -197,7 +197,7 @@ export async function fetchInterestedOpportunities(): Promise<InterestedOpportun
 }
 
 export async function logout() {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await deleteItem(TOKEN_KEY);
 }
 
 export interface PathStep {
