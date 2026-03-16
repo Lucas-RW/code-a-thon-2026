@@ -15,6 +15,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const authHeader = await getAuthHeader();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -69,7 +70,10 @@ export async function login(email: string, password: string): Promise<ApiResult<
   try {
     const response = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
+      },
       body: JSON.stringify({ email, password }),
     });
 
@@ -90,7 +94,10 @@ export async function register(email: string, password: string): Promise<ApiResu
   try {
     const response = await fetch(`${BASE_URL}/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
+      },
       body: JSON.stringify({ email, password }),
     });
 
@@ -131,6 +138,8 @@ export interface BuildingSummary {
   name: string;
   short_name?: string;
   description?: string;
+  lat: number;
+  lng: number;
 }
 
 export async function fetchBuildings(): Promise<BuildingSummary[]> {

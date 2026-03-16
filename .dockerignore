@@ -1,0 +1,10 @@
+node_modules
+.expo
+.git
+.vscode
+dist
+web-build
+*.log
+npm_install_output.txt
+tsc_errors.txt
+doctor.txt

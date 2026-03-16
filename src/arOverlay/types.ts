@@ -10,6 +10,12 @@ export interface ARBuilding {
   /** Display name of the building. */
   name: string;
 
+  /** Latitude coordinate. */
+  lat: number;
+
+  /** Longitude coordinate. */
+  lng: number;
+
   /**
    * Normalized horizontal screen position (0.0 = left edge, 1.0 = right edge).
    */
