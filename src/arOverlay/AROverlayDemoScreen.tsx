@@ -10,8 +10,10 @@
  */
 
 import * as React from 'react';
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState} from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 
 import { getMockARBuildings } from './mockData';
 import AROverlayLayer from './AROverlayLayer';
@@ -24,19 +26,36 @@ export default function AROverlayDemoScreen() {
   // Fetch mock data once (stable across re-renders).
   const buildings = useMemo(() => getMockARBuildings(), []);
 
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [permission, requestPermission] = useCameraPermissions();
+
+  if (!permission) {
+    // Camera permissions are still loading.
+    return <View />;
+  }
+
+  if (!permission.granted) {
+    // Camera permissions are not granted yet.
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <Button onPress={requestPermission} title="Grant Permission" />
+      </View>
+    );
+  }
+
+  function toggleCameraFacing() {
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
+  }
+
   return (
     <View style={styles.container}>
-      {/* ── Camera placeholder ─────────────────────────────────── */}
-      {/*
-       * Replace this View with <CameraView style={styles.camera} />
-       * from expo-camera when you're ready to use a real camera feed.
-       */}
-      <View style={styles.camera}>
-        <Text style={styles.placeholderText}>Camera View</Text>
-      </View>
-
+      <CameraView style={styles.camera} facing={facing} />
+      <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>
+        <Ionicons name="camera-reverse-outline" size={30} color="white" />
+      </TouchableOpacity>
       {/* ── AR overlay ─────────────────────────────────────────── */}
-      <AROverlayLayer buildings={buildings} />
+      {/* <AROverlayLayer buildings={buildings} /> */}
     </View>
   );
 }
@@ -44,17 +63,24 @@ export default function AROverlayDemoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    justifyContent: 'center',
+  },
+  message: {
+    textAlign: 'center',
+    paddingBottom: 10,
   },
   camera: {
     flex: 1,
-    backgroundColor: '#111',
+  },
+  flipButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  placeholderText: {
-    color: '#444',
-    fontSize: 18,
-    fontStyle: 'italic',
   },
 });
