@@ -49,6 +49,53 @@ From there you can open in:
 - **Android Emulator** — press `a`
 - **Web browser** — press `w`
 
+### Testing on a physical iOS device
+
+Testing on a physical iPhone requires a few extra steps because your phone needs to reach both the **Expo Metro bundler** (port 8081) and the **FastAPI backend** (port 8000) running on your computer.
+
+#### Step 1: Load the app bundle via tunnel
+
+When scanning the QR code on an iPhone, you may get a "request timed out" error. This happens because Windows Firewall typically blocks incoming connections on port 8081, so your phone can't download the JS bundle from Metro.
+
+Use tunnel mode, which routes the bundle through Expo's servers instead:
+
+```bash
+npx expo start --tunnel --clear
+```
+
+> **Note:** Tunnel mode requires `@expo/ngrok`. If prompted, install it with:
+> ```bash
+> npm install -g @expo/ngrok@^4.0.0
+> ```
+
+#### Step 2: Make the backend reachable from your phone
+
+The app on your phone makes API calls directly to the backend. `localhost` won't work — that points to the phone itself, not your computer. You need to use your computer's IP address, and your phone must be able to reach it.
+
+**The most reliable method: use your iPhone's Personal Hotspot**
+
+Router Wi-Fi networks often have "AP Isolation" enabled, which blocks devices on the same network from talking to each other. Using your phone's hotspot avoids this entirely.
+
+1. On your iPhone, enable **Personal Hotspot** (Settings → Personal Hotspot)
+2. Connect your **computer** to your phone's hotspot via Wi-Fi
+3. Find your computer's new IP address — run in PowerShell:
+   ```
+   ipconfig
+   ```
+   Look for `IPv4 Address` under the Wi-Fi adapter — it will be something like `172.20.10.7`
+4. Update `.env` with that IP:
+   ```env
+   EXPO_PUBLIC_API_BASE_URL=http://172.20.10.7:8000
+   ```
+5. Start the backend bound to all interfaces:
+   ```bash
+   python -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
+   ```
+6. Verify it works by opening `http://172.20.10.7:8000/health` in your phone's browser — it should return `{"status":"ok"}`
+7. Restart Expo: `npx expo start --tunnel --clear`
+
+> **Note:** Your computer's IP changes every time you reconnect to a network. Remember to re-run `ipconfig` and update `.env` if you switch networks.
+
 ---
 
 ## Backend Setup
