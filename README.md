@@ -158,6 +158,35 @@ The API will be available at `http://localhost:8000`. You can view the auto-gene
 
 ---
 
+## Docker Setup (Recommended)
+
+The easiest way to get everything running (including a local MongoDB database) is using Docker Compose.
+
+### 1. Requirements
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+### 2. Start all services
+
+```bash
+docker-compose up --build
+```
+
+This will:
+1.  Start a **local MongoDB instance** (no Atlas account needed!).
+2.  Start the **FastAPI backend** and connect it to the local DB.
+
+The API will be available at `http://localhost:8000`.
+
+### 3. Switching back to Atlas
+
+If you want to use MongoDB Atlas instead of the local Docker DB:
+1.  Open `docker-compose.yml`.
+2.  Comment out the `environment:` section under the `backend` service.
+3.  The backend will then use the `MONGODB_URI` from your `backend/.env` file.
+
+---
+
 ## Environment Variable Reference
 
 ### Frontend (`.env`)

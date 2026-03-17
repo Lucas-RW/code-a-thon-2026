@@ -11,6 +11,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { GoalType, GOAL_OPTIONS, PathStep, fetchPathfind } from '@/lib/api';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -22,6 +23,7 @@ import { useGraph } from '@/context/GraphContext';
 const { width } = Dimensions.get('window');
 
 export default function GoldenPathScreen() {
+  const router = useRouter();
   const { userProfile } = useAuth();
   const { showToast } = useToast();
   
@@ -133,8 +135,19 @@ export default function GoldenPathScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Your Golden Path</Text>
-        <Text style={styles.subtitle}>Guided journey to your campus goals</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View>
+            <Text style={styles.title}>Your Golden Path</Text>
+            <Text style={styles.subtitle}>Guided journey to your campus goals</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.graphViewButton}
+            onPress={() => router.push('/graph')}
+          >
+            <MaterialIcons name="hub" size={20} color="#3b82f6" />
+            <Text style={styles.graphViewButtonText}>Visual Graph</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -319,6 +332,22 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#94a3b8',
+  },
+  graphViewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  graphViewButtonText: {
+    color: '#3b82f6',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
   scrollContent: {
     padding: 24,
