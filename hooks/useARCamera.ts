@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
-import { DeviceMotion } from 'expo-sensors';
-import { Platform } from 'react-native';
 
 export interface DeviceState {
   location: Location.LocationObject | null;
-  heading: number | null; // Magnetic heading in degrees
+  heading: number | null;
 }
 
 export interface BuildingCoord {
@@ -22,105 +20,94 @@ export interface ProjectedBuilding {
   inView: boolean;
 }
 
-export function useARCamera(buildings: BuildingCoord[]) {
+export interface ARCameraResult {
+  projected: ProjectedBuilding[];
+  debugLat: number | null;
+  debugLng: number | null;
+  debugHeading: number | null;
+  debugInfo: string;
+}
+
+const MAX_DISTANCE_METERS = 500;
+const HFOV = 60;
+
+export function useARCamera(buildings: BuildingCoord[]): ARCameraResult {
   const [deviceState, setDeviceState] = useState<DeviceState>({
     location: null,
     heading: null,
   });
-  const [projectedBuildings, setProjectedBuildings] = useState<ProjectedBuilding[]>([]);
 
-  // 1. Subscribe to Location
+  // 1. Subscribe to GPS location
   useEffect(() => {
+    let sub: Location.LocationSubscription;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
-
-      const subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 1, // Update every 1 meter
-        },
-        (location: Location.LocationObject) => {
-          setDeviceState((prev) => ({ ...prev, location }));
-        }
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 2 },
+        (location) => setDeviceState((prev) => ({ ...prev, location }))
       );
-
-      return () => subscription.remove();
     })();
+    return () => sub?.remove();
   }, []);
 
-  // 2. Subscribe to Heading (Compass)
+  // 2. Subscribe to compass heading
   useEffect(() => {
+    let sub: Location.LocationSubscription;
     (async () => {
-      // DeviceMotion provides better results than Magnetometer for AR in some cases
-      // because it combines multiple sensors.
-      const { status } = await DeviceMotion.isAvailableAsync().then(() => ({ status: 'granted' })).catch(() => ({ status: 'denied' }));
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
-
-      DeviceMotion.setUpdateInterval(100); // 10Hz
-      const subscription = DeviceMotion.addListener((data: DeviceMotion.DeviceMotionMeasurement) => {
-        if (data.rotation) {
-          // Simplistic heading calculation from rotation
-          // In a real app, you'd use a more robust matrix transformation
-          // DeviceMotion.rotation.alpha is the rotation around the Z axis
-          let heading = (data.rotation.alpha * 180) / Math.PI;
-          if (heading < 0) heading += 360;
-          setDeviceState((prev) => ({ ...prev, heading }));
-        }
+      sub = await Location.watchHeadingAsync((headingData) => {
+        setDeviceState((prev) => ({ ...prev, heading: headingData.magHeading }));
       });
-
-      return () => subscription.remove();
     })();
+    return () => sub?.remove();
   }, []);
 
   // 3. Project buildings to screen coordinates
-  useEffect(() => {
-    const { location, heading } = deviceState;
-    if (!location || heading === null || buildings.length === 0) return;
+  const { location, heading } = deviceState;
 
-    const userLat = location.coords.latitude;
-    const userLng = location.coords.longitude;
+  const debugLat = location?.coords.latitude ?? null;
+  const debugLng = location?.coords.longitude ?? null;
+  const debugHeading = heading;
 
-    const nextProjected = buildings.map((b) => {
+  if (!location || heading === null || buildings.length === 0) {
+    const reason = !location ? 'no-gps' : heading === null ? 'no-heading' : 'no-buildings';
+    return { projected: [], debugLat, debugLng, debugHeading, debugInfo: reason };
+  }
+
+  const userLat = location.coords.latitude;
+  const userLng = location.coords.longitude;
+
+  const projected = buildings
+    .map((b): ProjectedBuilding | null => {
       const dist = getDistance(userLat, userLng, b.lat, b.lng);
+      if (dist > MAX_DISTANCE_METERS) return null;
+
       const bearing = getBearing(userLat, userLng, b.lat, b.lng);
 
-      // Relate bearing to current device heading
-      // 0 degrees is North
       let relativeBearing = (bearing - heading + 360) % 360;
-      
-      // Normalize to -180..180
       if (relativeBearing > 180) relativeBearing -= 360;
 
-      // Simplistic projection
-      // FOV is approx 60 degrees
-      const fov = 60;
-      const screenX = relativeBearing / fov + 0.5;
-      
-      // Fixed horizon for now
-      const screenY = 0.5;
+      const screenX = relativeBearing / HFOV + 0.5;
+      const inView = screenX >= 0.0 && screenX <= 1.0;
 
-      const inView = screenX >= -0.2 && screenX <= 1.2; // Keep slightly outside for smooth entry
+      return { id: b.id, screenX, screenY: 0.5, distanceMeters: Math.round(dist), inView };
+    })
+    .filter((b): b is ProjectedBuilding => b !== null);
 
-      return {
-        id: b.id,
-        screenX,
-        screenY,
-        distanceMeters: Math.round(dist),
-        inView,
-      };
-    });
+  const firstB = buildings[0];
+  const dist0 = getDistance(userLat, userLng, firstB.lat, firstB.lng);
+  const bear0 = getBearing(userLat, userLng, firstB.lat, firstB.lng);
+  const info = `b:${buildings.length} dist:${Math.round(dist0)}m bear:${bear0.toFixed(0)}° proj:${projected.length}`;
 
-    setProjectedBuildings(nextProjected);
-  }, [deviceState, buildings]);
-
-  return projectedBuildings;
+  return { projected, debugLat, debugLng, debugHeading, debugInfo: info };
 }
 
-// ── Math Helpers ─────────────────────────────────────────────────────────────
+// ── Math Helpers ──────────────────────────────────────────────────────────────
 
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371e3; // metres
+  const R = 6371e3;
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -145,6 +132,5 @@ function getBearing(lat1: number, lon1: number, lat2: number, lon2: number) {
     Math.cos(φ1) * Math.sin(φ2) -
     Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
   const θ = Math.atan2(y, x);
-  const brng = ((θ * 180) / Math.PI + 360) % 360; // in degrees
-  return brng;
+  return ((θ * 180) / Math.PI + 360) % 360;
 }
