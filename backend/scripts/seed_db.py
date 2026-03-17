@@ -40,6 +40,15 @@ async def main():
             "departments": ["Physics"],
             "description": "Home to the physics department.",
             "image_url": "https://example.com/npb.jpg"
+        },
+        {
+            "name": "Test Building",
+            "short_name": "TEST",
+            "lat": 28.347700,
+            "lng": -81.237564,
+            "departments": ["Testing"],
+            "description": "AR test building placed ~100m SSE of test coordinates.",
+            "image_url": None
         }
     ]
     
