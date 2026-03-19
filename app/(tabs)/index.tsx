@@ -1,86 +1,269 @@
 import * as React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { fetchBuildings, BuildingSummary } from '@/lib/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity } from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useAuth } from '@/context/AuthContext';
 import { shadows, theme } from '@/lib/theme';
+
+type FeedItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  buildingId: string;
+  buildingShortName?: string;
+};
+
+function getInitials(label: string) {
+  return label
+    .split(' ')
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { userProfile } = useAuth();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
+  const [interests, setInterests] = React.useState<InterestedOpportunity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
 
-  const loadBuildings = async () => {
+  const loadHome = React.useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      const data = await fetchBuildings();
-      setBuildings(data);
+      const [buildingData, interestData] = await Promise.all([
+        fetchBuildings(),
+        fetchInterestedOpportunities().catch(() => [] as InterestedOpportunity[]),
+      ]);
+      setBuildings(buildingData);
+      setInterests(interestData);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
-      setError(msg);
       showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
 
   React.useEffect(() => {
-    loadBuildings();
-  }, []);
+    loadHome();
+  }, [loadHome]);
 
-  const renderItem = ({ item }: { item: BuildingSummary }) => (
-    <TouchableOpacity 
-      style={styles.card}
-      onPress={() => router.push({
-        pathname: "/building/[id]",
-        params: { 
-          id: item.id,
-          name: item.name,
-          short_name: item.short_name || ''
-        }
-      })}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.name}>{item.name}</Text>
-        <MaterialIcons name="chevron-right" size={20} color={theme.colors.textMuted} />
-      </View>
-      {item.short_name && <Text style={styles.shortName}>{item.short_name}</Text>}
-      {item.description && (
-        <Text style={styles.description} numberOfLines={2}>
-          {item.description}
-        </Text>
-      )}
-    </TouchableOpacity>
+  const buildingLookup = React.useMemo(
+    () => new Map(buildings.map((building) => [building.id, building])),
+    [buildings]
   );
 
+  const personalizedBuildings = React.useMemo(() => {
+    const rankedIds = interests.map((item) => item.building_id);
+    const uniqueRanked = Array.from(new Set(rankedIds));
+    const prioritized = uniqueRanked
+      .map((id) => buildingLookup.get(id))
+      .filter((item): item is BuildingSummary => Boolean(item));
+
+    const fallback = buildings.filter((building) => !uniqueRanked.includes(building.id));
+    return [...prioritized, ...fallback].slice(0, 8);
+  }, [buildingLookup, buildings, interests]);
+
+  const featuredOpportunity = interests[0] ?? null;
+
+  const recentActivity = React.useMemo(
+    () => [
+      {
+        id: 'interests',
+        label: 'Saved',
+        value: String(interests.length),
+        icon: 'bookmark',
+      },
+      {
+        id: 'goals',
+        label: 'Goals',
+        value: String(userProfile?.goals.length ?? 0),
+        icon: 'track-changes',
+      },
+      {
+        id: 'next',
+        label: 'Next Step',
+        value: featuredOpportunity ? 'Ready' : 'Explore',
+        icon: 'auto-awesome',
+      },
+    ],
+    [featuredOpportunity, interests.length, userProfile?.goals.length]
+  );
+
+  const feedItems = React.useMemo<FeedItem[]>(() => {
+    const items = interests.slice(0, 5).map((item) => ({
+      id: item.id,
+      title: item.title,
+      subtitle:
+        item.type === 'research'
+          ? 'A professor in your orbit has a research opening.'
+          : item.type === 'event'
+            ? 'A campus event connected to your interests is coming up.'
+            : 'A new opportunity matches the direction of your graph.',
+      meta: item.building_name,
+      buildingId: item.building_id,
+      buildingShortName: item.building_short_name,
+    }));
+
+    if (items.length > 0) {
+      return items;
+    }
+
+    return buildings.slice(0, 3).map((building, index) => ({
+      id: building.id,
+      title: `${building.name} has new pathways to explore`,
+      subtitle: 'Jump back into a relevant location and see what opportunities are nearby.',
+      meta: index === 0 ? 'Suggested next move' : 'Recommended building',
+      buildingId: building.id,
+      buildingShortName: building.short_name,
+    }));
+  }, [buildings, interests]);
+
+  const openBuilding = (building: BuildingSummary | { id: string; name?: string; short_name?: string }) => {
+    router.push({
+      pathname: '/building/[id]',
+      params: {
+        id: building.id,
+        name: building.name ?? 'Building',
+        short_name: building.short_name || '',
+      },
+    });
+  };
+
   if (isLoading && buildings.length === 0) {
-    return <LoadingState message="Loading campus..." />;
+    return <LoadingState message="Loading your command center..." />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Campus Discovery</Text>
-        <Text style={styles.subtitle}>Explore buildings and opportunities</Text>
-      </View>
-      
-      <FlatList
-        data={buildings}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          !isLoading ? <Text style={styles.emptyText}>No buildings found.</Text> : null
-        }
-        onRefresh={loadBuildings}
-        refreshing={isLoading}
-      />
+        onScrollBeginDrag={() => undefined}
+        refreshControl={undefined}
+      >
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.brand}>CampusLens</Text>
+            <Text style={styles.greeting}>
+              {userProfile?.name ? `What should we unlock next, ${userProfile.name.split(' ')[0]}?` : 'Your personalized campus command center'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.iconButton} onPress={() => showToast('Notifications coming soon', 'info')}>
+            <MaterialIcons name="notifications-none" size={22} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Your Buildings</Text>
+          <Text style={styles.sectionHint}>Quick return points</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.buildingRail}>
+          {personalizedBuildings.map((building) => (
+            <TouchableOpacity key={building.id} style={styles.buildingPill} onPress={() => openBuilding(building)}>
+              <LinearGradient colors={[...theme.gradients.panelGlow]} style={styles.buildingAvatar}>
+                <Text style={styles.buildingAvatarText}>{getInitials(building.short_name || building.name)}</Text>
+              </LinearGradient>
+              <Text style={styles.buildingLabel} numberOfLines={1}>
+                {building.short_name || building.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionHint}>Your momentum</Text>
+        </View>
+        <View style={styles.activityRow}>
+          {recentActivity.map((item) => (
+            <View key={item.id} style={styles.activityCard}>
+              <MaterialIcons name={item.icon as any} size={18} color={theme.colors.accentTertiary} />
+              <Text style={styles.activityValue}>{item.value}</Text>
+              <Text style={styles.activityLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Featured Opportunity</Text>
+          <Text style={styles.sectionHint}>Best next move</Text>
+        </View>
+        <LinearGradient colors={[...theme.gradients.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>
+              {featuredOpportunity?.type?.replace('_', ' ').toUpperCase() || 'EXPLORE'}
+            </Text>
+          </View>
+          <Text style={styles.heroTitle}>
+            {featuredOpportunity?.title || 'Discover a building that can move your path forward'}
+          </Text>
+          <Text style={styles.heroDescription}>
+            {featuredOpportunity?.description ||
+              'Start with a high-signal campus location, then branch into relevant opportunities from there.'}
+          </Text>
+          <View style={styles.heroMetaRow}>
+            <MaterialIcons name="place" size={16} color={theme.colors.textOnAccent} />
+            <Text style={styles.heroMetaText}>
+              {featuredOpportunity?.building_name || personalizedBuildings[0]?.name || 'Campus-wide'}
+            </Text>
+          </View>
+          <View style={styles.heroActions}>
+            <TouchableOpacity
+              style={styles.heroPrimaryButton}
+              onPress={() =>
+                featuredOpportunity
+                  ? openBuilding({
+                      id: featuredOpportunity.building_id,
+                      name: featuredOpportunity.building_name,
+                      short_name: featuredOpportunity.building_short_name,
+                    })
+                  : personalizedBuildings[0] && openBuilding(personalizedBuildings[0])
+              }
+            >
+              <Text style={styles.heroPrimaryText}>View</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.heroSecondaryButton} onPress={() => router.push('/my-opportunities')}>
+              <Text style={styles.heroSecondaryText}>Interested</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>From Your Network</Text>
+          <Text style={styles.sectionHint}>Graph-based updates</Text>
+        </View>
+        {feedItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.feedCard}
+            onPress={() =>
+              openBuilding({
+                id: item.buildingId,
+                name: item.meta,
+                short_name: item.buildingShortName,
+              })
+            }
+          >
+            <View style={styles.feedIcon}>
+              <MaterialIcons name="hub" size={18} color={theme.colors.accentTertiary} />
+            </View>
+            <View style={styles.feedBody}>
+              <Text style={styles.feedTitle}>{item.title}</Text>
+              <Text style={styles.feedSubtitle}>{item.subtitle}</Text>
+              <Text style={styles.feedMeta}>{item.meta}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -90,63 +273,226 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.backgroundPrimary,
   },
-  header: {
-    padding: 24,
-    paddingTop: 40,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 120,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  brand: {
     color: theme.colors.textPrimary,
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.8,
   },
-  subtitle: {
-    fontSize: 16,
+  greeting: {
     color: theme.colors.textSecondary,
+    fontSize: 14,
+    marginTop: 6,
+    maxWidth: 250,
   },
-  listContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  card: {
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...shadows.card,
   },
-  cardHeader: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'baseline',
+    marginBottom: 14,
   },
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  sectionTitle: {
     color: theme.colors.textPrimary,
-    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
   },
-  shortName: {
-    fontSize: 14,
-    color: theme.colors.accentTertiary,
+  sectionHint: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  buildingRail: {
+    paddingBottom: 10,
+    gap: 14,
+    marginBottom: 28,
+  },
+  buildingPill: {
+    width: 82,
+    alignItems: 'center',
+  },
+  buildingAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.whiteSoft,
+    marginBottom: 10,
+  },
+  buildingAvatarText: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  buildingLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
     fontWeight: '600',
+  },
+  activityRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 28,
+  },
+  activityCard: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
+    ...shadows.card,
+  },
+  activityValue: {
+    color: theme.colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+  activityLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  heroCard: {
+    borderRadius: 26,
+    padding: 22,
+    marginBottom: 28,
+    ...shadows.glow,
+  },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 14,
+  },
+  heroBadgeText: {
+    color: theme.colors.textOnAccent,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  heroTitle: {
+    color: theme.colors.textOnAccent,
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 31,
+    marginBottom: 10,
+  },
+  heroDescription: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+    gap: 6,
+  },
+  heroMetaText: {
+    color: theme.colors.textOnAccent,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  heroActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  heroPrimaryButton: {
+    backgroundColor: theme.colors.textOnAccent,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  heroPrimaryText: {
+    color: theme.colors.backgroundPrimary,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  heroSecondaryButton: {
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroSecondaryText: {
+    color: theme.colors.textOnAccent,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  feedCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
+    marginBottom: 14,
+    ...shadows.card,
+  },
+  feedIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: theme.colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  feedBody: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  feedTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  feedSubtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 8,
   },
-  description: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    lineHeight: 20,
-  },
-  emptyText: {
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginTop: 40,
-    fontSize: 16,
+  feedMeta: {
+    color: theme.colors.accentTertiary,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
 });
