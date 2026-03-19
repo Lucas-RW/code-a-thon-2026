@@ -89,7 +89,7 @@ export default function GoldenPathScreen() {
             {[
               { key: 'skills' as const, label: 'Skills Map' },
               { key: 'network' as const, label: 'Network Map' },
-            ].map((option, index) => {
+            ].map((option) => {
               const isActive = graphMode === option.key;
 
               if (isActive) {
@@ -105,7 +105,6 @@ export default function GoldenPathScreen() {
                         <Text style={styles.activeToggleText}>{option.label}</Text>
                       </Pressable>
                     </LinearGradient>
-                    {index === 0 ? <View style={styles.toggleDivider} /> : null}
                   </React.Fragment>
                 );
               }
@@ -118,7 +117,6 @@ export default function GoldenPathScreen() {
                   >
                     <Text style={styles.inactiveToggleText}>{option.label}</Text>
                   </Pressable>
-                  {index === 0 ? <View style={styles.toggleDivider} /> : null}
                 </React.Fragment>
               );
             })}
@@ -138,18 +136,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.backgroundPrimary,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 20,
     paddingBottom: 112,
   },
   header: {
-    paddingTop: 12,
-    marginBottom: 20,
+    marginBottom: 28,
   },
   title: {
     fontSize: 30,
     fontWeight: '800',
     color: theme.colors.textPrimary,
-    letterSpacing: -0.6,
+    letterSpacing: -0.8,
   },
   subtitle: {
     marginTop: 8,
@@ -214,7 +211,6 @@ const styles = StyleSheet.create({
   },
   toggleDock: {
     marginTop: 10,
-    padding: 6,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
@@ -254,11 +250,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
-  },
-  toggleDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: theme.colors.border,
-    marginVertical: 6,
   },
 });

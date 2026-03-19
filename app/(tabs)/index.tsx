@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: theme.colors.textPrimary,
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
