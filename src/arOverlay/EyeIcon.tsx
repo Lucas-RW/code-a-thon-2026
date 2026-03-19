@@ -28,31 +28,16 @@ const ICON_SIZE = 44;
  */
 export default function EyeIcon({ onPress, x, y, themeColor = '#FFFFFF' }: EyeIconProps) {
   // ── Bobbing animation ──────────────────────────────────────────
-  const bobAnim = useRef(new Animated.Value(0)).current;
+  const popAnim = useRef(new Animated.Value(0.86)).current;
 
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bobAnim, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [bobAnim]);
-
-  const translateY = bobAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-3, 3],
-  });
+    Animated.spring(popAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [popAnim]);
 
   // ── Press scale animation ──────────────────────────────────────
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -78,7 +63,7 @@ export default function EyeIcon({ onPress, x, y, themeColor = '#FFFFFF' }: EyeIc
     position: 'absolute',
     left: x - ICON_SIZE / 2,
     top: y - ICON_SIZE / 2,
-    transform: [{ translateY }, { scale: scaleAnim }],
+    transform: [{ scale: Animated.multiply(popAnim, scaleAnim) }],
   };
 
   return (
@@ -89,7 +74,7 @@ export default function EyeIcon({ onPress, x, y, themeColor = '#FFFFFF' }: EyeIc
         onPressOut={handlePressOut}
         style={styles.button}
       >
-        <Ionicons name="eye-outline" size={22} color={themeColor} />
+        <Ionicons name="search" size={21} color={themeColor} />
       </Pressable>
     </Animated.View>
   );
@@ -100,11 +85,11 @@ const styles = StyleSheet.create({
     width: ICON_SIZE,
     height: ICON_SIZE,
     borderRadius: ICON_SIZE / 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
     alignItems: 'center',
     justifyContent: 'center',
-    // Drop shadow (iOS + Android elevation)
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.34)',
     elevation: 5,
   },
 });

@@ -19,6 +19,18 @@ import { fetchBuildings, BuildingSummary } from '@/lib/api';
 import AROverlayLayer from './AROverlayLayer';
 import { useARCamera } from '@/hooks/useARCamera';
 import { ARBuilding } from './types';
+import { theme } from '@/lib/theme';
+
+function inferBuildingType(building: BuildingSummary): ARBuilding['buildingType'] {
+  const label = `${building.name} ${building.short_name ?? ''}`.toLowerCase();
+  if (label.includes('union') || label.includes('student') || label.includes('reitz')) {
+    return 'student_life';
+  }
+  if (label.includes('engineering') || label.includes('malachowsky') || label.includes('computer')) {
+    return 'engineering';
+  }
+  return 'science';
+}
 
 
 export default function AROverlayDemoScreen() {
@@ -50,9 +62,12 @@ export default function AROverlayDemoScreen() {
         name: b?.name || 'Unknown',
         lat: b?.lat || 0,
         lng: b?.lng || 0,
-        opportunityCount: 0, // Could be fetched per building if needed
-        buildingType: 'science', // Default or map from building data
+        image_url: b?.image_url,
+        opportunityCount: 4,
+        buildingType: b ? inferBuildingType(b) : 'science',
         description: b?.description,
+        hours: 'Open now',
+        history: 'A central place where physical campus space connects to your opportunity graph.',
       };
     });
   }, [projectedData, buildings]);
@@ -73,7 +88,7 @@ export default function AROverlayDemoScreen() {
       
       {isLoading ? (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
+          <ActivityIndicator size="large" color={theme.colors.textOnAccent} />
         </View>
       ) : (
         <AROverlayLayer buildings={arBuildings} />

@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { fetchBuildings, BuildingSummary } from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
+import { shadows, theme } from '@/lib/theme';
 
 export default function BuildingsScreen() {
   const router = useRouter();
@@ -87,50 +88,51 @@ export default function BuildingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
     padding: 20,
   },
   listContent: {
     padding: 16,
   },
   card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: theme.colors.border,
+    ...shadows.card,
   },
   name: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   shortName: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   description: {
     fontSize: 14,
-    color: '#cbd5e1',
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
   errorText: {
-    color: '#f87171',
+    color: theme.colors.error,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: theme.colors.accentSecondary,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyText: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: 40,
     fontSize: 16,

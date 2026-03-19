@@ -32,10 +32,10 @@ export function themeColorForBuildingType(
 ): string {
   switch (buildingType) {
     case 'engineering':
-      return '#FF6B35'; // warm orange
+      return '#4F46E5';
     case 'student_life':
-      return '#4ECDC4'; // teal
+      return '#2563EB';
     case 'science':
-      return '#A78BFA'; // soft purple
+      return '#A78BFA';
   }
 }

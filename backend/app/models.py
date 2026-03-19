@@ -13,6 +13,7 @@ class Building(BaseModel):
     departments: List[str]
     description: Optional[str] = None
     image_url: Optional[str] = None
+    professors: Optional[List[Dict[str, Any]]] = None
     source: Optional[str] = None           # e.g. "manual" | "ai_generated" | "ai_fallback"
     confidence: Optional[float] = None
 

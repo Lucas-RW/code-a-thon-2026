@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MagicButton from '@/components/MagicButton';
 import { View } from 'react-native';
+import { theme } from '@/lib/theme';
 
 export default function TabLayout() {
   return (
@@ -9,17 +10,17 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0f172a',
-          borderTopColor: '#1e293b',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           height: 85,
           paddingBottom: 25,
           paddingTop: 10,
           position: 'absolute', // Allow the button to pop out
-          borderTopWidth: 0,
+          borderTopWidth: 1,
           elevation: 0,
         },
-        tabBarActiveTintColor: '#3b82f6',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: theme.colors.accentTertiary,
+        tabBarInactiveTintColor: theme.colors.textMuted,
       }}
     >
       <Tabs.Screen

@@ -4,8 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { GraphProvider } from '@/context/GraphContext';
+import { theme } from '@/lib/theme';
 
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { accessToken, userProfile, isLoading, isProfileComplete } = useAuth();
@@ -22,8 +24,8 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundPrimary }}>
+        <ActivityIndicator size="large" color={theme.colors.accentTertiary} />
       </View>
     );
   }
@@ -33,20 +35,22 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <GraphProvider>
-          <NavigationGuard>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="auth" />
-              <Stack.Screen name="profile-builder" />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-          </NavigationGuard>
-        </GraphProvider>
-      </ToastProvider>
-      <StatusBar style="light" />
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <ToastProvider>
+          <GraphProvider>
+            <NavigationGuard>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="auth" />
+                <Stack.Screen name="profile-builder" />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+            </NavigationGuard>
+          </GraphProvider>
+        </ToastProvider>
+        <StatusBar style="light" />
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

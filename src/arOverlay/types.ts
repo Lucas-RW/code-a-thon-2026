@@ -4,6 +4,7 @@
 
 /** Represents a building detected/positioned in the AR view. */
 export interface ARBuilding {
+  
   /** Unique identifier for the building. */
   id: string;
 
@@ -41,6 +42,8 @@ export interface ARBuilding {
 
   /** Detailed description of the building. */
   description?: string;
+  /** Optional hero image url for the building sheet. */
+  image_url?: string;
   /** Opening hours placeholder. */
   hours?: string;
   /** Historical context or fun facts. */

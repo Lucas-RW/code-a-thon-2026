@@ -1,8 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, View, Animated, Platform } from 'react-native';
+import { TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 interface MagicButtonProps {
   size?: number;
@@ -47,9 +49,14 @@ export default function MagicButton({ size = 64 }: MagicButtonProps) {
         onPress={handlePress}
         style={[styles.button, { width: size, height: size, borderRadius: size / 2 }]}
       >
-        <View style={styles.innerCircle}>
-          <MaterialIcons name="camera" size={size * 0.5} color="#fff" />
-        </View>
+        <LinearGradient
+          colors={[...theme.gradients.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.innerCircle, { borderRadius: size / 2 }]}
+        >
+          <MaterialIcons name="camera" size={size * 0.5} color={theme.colors.textOnAccent} />
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -61,24 +68,14 @@ const styles = StyleSheet.create({
     top: -20,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
+    ...shadows.glow,
   },
   button: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: theme.colors.backgroundPrimary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: '#0f172a', // Match the tab bar background if possible
+    borderColor: theme.colors.surface,
   },
   innerCircle: {
     width: '100%',

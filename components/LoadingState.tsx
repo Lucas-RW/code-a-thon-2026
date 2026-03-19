@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { theme } from '@/lib/theme';
 
 interface LoadingStateProps {
   message?: string;
@@ -8,7 +9,7 @@ interface LoadingStateProps {
 export default function LoadingState({ message = 'Loading...' }: LoadingStateProps) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#3b82f6" />
+      <ActivityIndicator size="large" color={theme.colors.accentTertiary} />
       {message ? <Text style={styles.text}>{message}</Text> : null}
     </View>
   );
@@ -20,11 +21,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   text: {
     marginTop: 16,
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     fontWeight: '500',
   },

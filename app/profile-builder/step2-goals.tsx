@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useProfileBuilder } from '@/context/ProfileBuilderContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 const GOALS = [
   { id: 'career', label: 'Career Opportunities', icon: '💼', description: 'Internships, jobs, and professional growth.' },
@@ -33,7 +35,7 @@ export default function Step2Goals() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={[...theme.gradients.hero]} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.stepText}>Step 2 of 3</Text>
@@ -69,20 +71,21 @@ export default function Step2Goals() {
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.nextButton, profileData.goals.length === 0 && styles.buttonDisabled]} 
+          style={[styles.buttonShell, profileData.goals.length === 0 && styles.buttonDisabled]} 
           onPress={handleNext}
         >
-          <Text style={styles.nextButtonText}>Next</Text>
+          <LinearGradient colors={[...theme.gradients.accent]} style={styles.nextButton}>
+            <Text style={styles.nextButtonText}>Next</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollContent: {
     padding: 24,
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   stepText: {
-    color: '#aaa',
+    color: theme.colors.accentTertiary,
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -102,11 +105,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
   goalList: {
@@ -115,15 +118,16 @@ const styles = StyleSheet.create({
   goalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 16,
+    borderColor: theme.colors.border,
+    borderRadius: 18,
     padding: 20,
+    ...shadows.card,
   },
   goalCardActive: {
-    borderColor: '#fff',
-    backgroundColor: '#151515',
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceAlt,
   },
   goalIcon: {
     fontSize: 32,
@@ -135,14 +139,14 @@ const styles = StyleSheet.create({
   goalLabel: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#eee',
+    color: theme.colors.textPrimary,
   },
   goalLabelActive: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
   goalDescription: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   checkbox: {
@@ -150,26 +154,26 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
   },
   checkboxActive: {
-    borderColor: '#fff',
+    borderColor: theme.colors.borderStrong,
   },
   checkboxInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.accentTertiary,
   },
   footer: {
     flexDirection: 'row',
     padding: 24,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: theme.colors.border,
     gap: 12,
   },
   backButton: {
@@ -178,25 +182,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   backButtonText: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
-  nextButton: {
+  buttonShell: {
     flex: 2,
-    backgroundColor: '#fff',
-    padding: 18,
     borderRadius: 12,
+    overflow: 'hidden',
+    ...shadows.glow,
+  },
+  nextButton: {
+    padding: 18,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.3,
   },
   nextButtonText: {
-    color: '#000',
+    color: theme.colors.textOnAccent,
     fontSize: 16,
     fontWeight: '700',
   },
