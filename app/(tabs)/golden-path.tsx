@@ -1,597 +1,264 @@
 import * as React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  TextInput, 
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Linking
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { GoalType, GOAL_OPTIONS, PathStep, fetchPathfind } from '@/lib/api';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useToast } from '@/context/ToastContext';
-import LoadingState from '@/components/LoadingState';
-import { sendGraphMessage } from '@/lib/graphMessaging';
-import { useGraph } from '@/context/GraphContext';
-import { theme } from '@/lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-const { width } = Dimensions.get('window');
+import { useToast } from '@/context/ToastContext';
+import { shadows, theme } from '@/lib/theme';
+
+type GraphMode = 'skills' | 'network';
+
+const SUGGESTED_PROMPTS = [
+  'How do I become a software engineer?',
+  'What skills are needed for robotics?',
+  'What clubs help with product management?',
+];
 
 export default function GoldenPathScreen() {
-  const router = useRouter();
-  const { userProfile } = useAuth();
   const { showToast } = useToast();
-  
-  // A.5 Profile-driven defaults
-  const initialGoal = (userProfile?.goals && userProfile.goals.length > 0) ? userProfile.goals[0] : "career";
-  const [selectedGoal, setSelectedGoal] = React.useState<GoalType>(initialGoal as GoalType);
-  
-  // Effect to prefill goal text based on profile
-  const [goalText, setGoalText] = React.useState('');
-  React.useEffect(() => {
-    if (userProfile && !goalText) {
-      if (selectedGoal === "research") {
-        const fields = userProfile.goal_preferences?.research?.fields || [];
-        if (fields.length > 0) {
-          setGoalText(`I want to get into ${fields[0]} research.`);
-        }
-      } else if (selectedGoal === "career") {
-        const industries = userProfile.goal_preferences?.career?.industries || [];
-        if (industries.length > 0) {
-          setGoalText(`I am looking for roles in ${industries[0]}.`);
-        }
-      }
+  const [query, setQuery] = React.useState('');
+  const [graphMode, setGraphMode] = React.useState<GraphMode>('skills');
+
+  const submitPrompt = React.useCallback(() => {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      showToast('Enter a prompt to explore the graph.', 'info');
+      return;
     }
-  }, [selectedGoal, userProfile]);
 
-  const [steps, setSteps] = React.useState<PathStep[]>([]);
-  const [isGenerating, setIsGenerating] = React.useState(false);
-  const [playbackIndex, setPlaybackIndex] = React.useState<number | null>(null);
-  
-  // B.2 Graph Messaging Refs (Using shared ref from context)
-  const { webViewRef } = useGraph();
-  
-  const fadeAnims = React.useRef<Animated.Value[]>([]).current;
-  const scrollViewRef = React.useRef<ScrollView>(null);
-
-  const generatePath = async () => {
-    try {
-      setIsGenerating(true);
-      setPlaybackIndex(null);
-      const response = await fetchPathfind({ goal_type: selectedGoal, goal_text: goalText });
-      const newSteps = response.steps;
-      setSteps(newSteps);
-      
-      // B.2 Highlight full path on generation
-      if (newSteps.length > 0) {
-        const allSkillNodeIds = newSteps.flatMap(s => s.skill_node_ids || []);
-        const allNetworkNodeIds = newSteps.flatMap(s => s.network_node_ids || []);
-        
-        sendGraphMessage(webViewRef, { type: "HIGHLIGHT_PATH", skillNodeIds: allSkillNodeIds, networkNodeIds: allNetworkNodeIds });
-      }
-
-      // Initialize animations
-      fadeAnims.length = 0;
-      newSteps.forEach(() => {
-        fadeAnims.push(new Animated.Value(1));
-      });
-      
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Couldn’t generate a path, please try again.', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const playPath = () => {
-    if (steps.length === 0) return;
-    
-    let current = 0;
-    setPlaybackIndex(current);
-    
-    // Initial highlight for first step
-    sendGraphMessage(webViewRef, { type: "HIGHLIGHT_PATH", skillNodeIds: steps[current].skill_node_ids, networkNodeIds: steps[current].network_node_ids });
-
-    const interval = setInterval(() => {
-      current++;
-      if (current >= steps.length) {
-        clearInterval(interval);
-        setPlaybackIndex(null);
-        sendGraphMessage(webViewRef, { type: "CLEAR_HIGHLIGHT" });
-        return;
-      }
-      setPlaybackIndex(current);
-      
-      // B.2 Highlight current step nodes
-      sendGraphMessage(webViewRef, { type: "HIGHLIGHT_PATH", skillNodeIds: steps[current].skill_node_ids, networkNodeIds: steps[current].network_node_ids });
-
-      // Auto-scroll to current step
-      scrollViewRef.current?.scrollTo({
-        y: current * 180, 
-        animated: true
-      });
-    }, 2500);
-  };
-
-  const handleCtaPress = async (url: string) => {
-    if (!url) return;
-    try {
-      if (url.startsWith('http')) {
-        await Linking.openURL(url);
-      } else {
-        // Handle internal deep links if needed via router
-        showToast(`Locating building: ${url}`, 'info');
-      }
-    } catch (err) {
-      showToast('Could not open link', 'error');
-    }
-  };
+    showToast('Graph search is simulated for now. Canvas is coming next.', 'info');
+  }, [query, showToast]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={styles.title}>Your Golden Path</Text>
-            <Text style={styles.subtitle}>Guided journey to your campus goals</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Growth Graph</Text>
+          <Text style={styles.subtitle}>
+            Explore how skills, professors, clubs, and opportunities connect.
+          </Text>
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchShell}>
+            <MaterialIcons
+              name="auto-awesome"
+              size={18}
+              color={theme.colors.textMuted}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Ask about careers, clubs, or skills..."
+              placeholderTextColor={theme.colors.textMuted}
+              style={styles.searchInput}
+              returnKeyType="send"
+              onSubmitEditing={submitPrompt}
+            />
+            <Pressable onPress={submitPrompt} style={styles.submitButton}>
+              <MaterialIcons
+                name="south-east"
+                size={22}
+                color={theme.colors.backgroundPrimary}
+              />
+            </Pressable>
           </View>
-          <TouchableOpacity 
-            style={styles.graphViewButton}
-            onPress={() => router.push('/graph')}
-          >
-            <MaterialIcons name="hub" size={20} color={theme.colors.accentTertiary} />
-            <Text style={styles.graphViewButtonText}>Visual Graph</Text>
-          </TouchableOpacity>
+
+          <View style={styles.promptRow}>
+            {SUGGESTED_PROMPTS.map((prompt) => (
+              <Pressable key={prompt} onPress={() => setQuery(prompt)} style={styles.promptChip}>
+                <Text style={styles.promptChipText}>{prompt}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.canvasSpacer} />
+
+        <View style={styles.toggleDock}>
+          <View style={styles.toggleTrack}>
+            {[
+              { key: 'skills' as const, label: 'Skills Map' },
+              { key: 'network' as const, label: 'Network Map' },
+            ].map((option, index) => {
+              const isActive = graphMode === option.key;
+
+              if (isActive) {
+                return (
+                  <React.Fragment key={option.key}>
+                    <LinearGradient
+                      colors={theme.gradients.accent}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.activeToggle}
+                    >
+                      <Pressable onPress={() => setGraphMode(option.key)} style={styles.toggleButton}>
+                        <Text style={styles.activeToggleText}>{option.label}</Text>
+                      </Pressable>
+                    </LinearGradient>
+                    {index === 0 ? <View style={styles.toggleDivider} /> : null}
+                  </React.Fragment>
+                );
+              }
+
+              return (
+                <React.Fragment key={option.key}>
+                  <Pressable
+                    onPress={() => setGraphMode(option.key)}
+                    style={styles.inactiveToggle}
+                  >
+                    <Text style={styles.inactiveToggleText}>{option.label}</Text>
+                  </Pressable>
+                  {index === 0 ? <View style={styles.toggleDivider} /> : null}
+                </React.Fragment>
+              );
+            })}
+          </View>
         </View>
       </View>
-
-      <ScrollView 
-        ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.configSection}>
-          <Text style={styles.sectionTitle}>What's your primary focus?</Text>
-          <View style={styles.goalGrid}>
-            {GOAL_OPTIONS.map((goal) => (
-              <TouchableOpacity
-                key={goal.id}
-                style={[
-                  styles.goalButton,
-                  selectedGoal === goal.id && styles.activeGoalButton
-                ]}
-                onPress={() => setSelectedGoal(goal.id)}
-              >
-                <Text style={[
-                  styles.goalButtonText,
-                  selectedGoal === goal.id && styles.activeGoalButtonText
-                ]}>
-                  {goal.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Additional context (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. I want to build a portfolio for UX design"
-            placeholderTextColor={theme.colors.textMuted}
-            value={goalText}
-            onChangeText={setGoalText}
-            multiline
-          />
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={[
-                styles.generateButton, 
-                isGenerating && styles.disabledButton,
-                steps.length > 0 && styles.regenerateButton
-              ]}
-              onPress={generatePath}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <ActivityIndicator color={theme.colors.textOnAccent} />
-              ) : (
-                <>
-                  <MaterialIcons 
-                    name={steps.length > 0 ? "refresh" : "auto-fix-high"} 
-                    size={20} 
-                    color="#fff" 
-                    style={{ marginRight: 8 }} 
-                  />
-                  <Text style={styles.generateButtonText}>
-                    {steps.length > 0 ? "Regenerate Path" : "Generate My Path"}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-            
-            {userProfile && (
-              <TouchableOpacity 
-                style={styles.profileUsageButton}
-                onPress={() => {
-                  setGoalText(''); // Trigger the useEffect to re-apply template
-                  showToast('Re-applied profile goals', 'info');
-                }}
-              >
-                <MaterialIcons name="person-outline" size={18} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {steps.length > 0 && (
-          <View style={styles.stepsSection}>
-            <View style={styles.stepsHeader}>
-              <Text style={styles.sectionTitle}>The Recommended Route</Text>
-              <TouchableOpacity onPress={playPath} style={styles.playButton} disabled={playbackIndex !== null}>
-                <MaterialIcons name="play-arrow" size={24} color={playbackIndex !== null ? "#64748b" : "#3b82f6"} />
-                <Text style={[styles.playButtonText, playbackIndex !== null && { color: "#64748b" }]}>
-                  {playbackIndex !== null ? "Playing..." : "Play Path"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {steps.map((step, index) => (
-              <View key={step.opportunity_id + index} style={styles.stepWrapper}>
-                <View style={styles.stepConnectorLineContainer}>
-                  <View style={[
-                    styles.stepConnectorLine,
-                    playbackIndex !== null && playbackIndex >= index && styles.activeConnectorLine,
-                    index === steps.length - 1 && { height: 40 } // Cap the last line
-                  ]} />
-                  <View style={[
-                    styles.stepMarker,
-                    playbackIndex === index && styles.highlightedMarker,
-                    playbackIndex !== null && playbackIndex > index && styles.completedMarker
-                  ]}>
-                    <Text style={styles.stepNumber}>{step.order}</Text>
-                  </View>
-                </View>
-
-                <Animated.View style={[
-                  styles.stepCard,
-                  playbackIndex === index && styles.highlightedCard
-                ]}>
-                  <View style={styles.stepCardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.stepTitle}>{step.opportunity_title}</Text>
-                      <View style={styles.buildingRow}>
-                        <MaterialIcons name="business" size={14} color="#94a3b8" />
-                        <Text style={styles.buildingName}>{step.building_name}</Text>
-                      </View>
-                    </View>
-                    {playbackIndex === index && (
-                      <MaterialIcons name="insights" size={20} color="#3b82f6" />
-                    )}
-                  </View>
-                  
-                  {step.short_reason && (
-                    <Text style={styles.shortReason}>{step.short_reason}</Text>
-                  )}
-
-                  <View style={styles.skillsContainer}>
-                    {step.skills.map((skill) => (
-                      <View key={skill} style={styles.skillPill}>
-                        <Text style={styles.skillPillText}>{skill}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {(step.cta_label && step.cta_url) && (
-                    <TouchableOpacity 
-                      style={styles.ctaButton}
-                      onPress={() => step.cta_url && handleCtaPress(step.cta_url)}
-                    >
-                      <Text style={styles.ctaButtonText}>{step.cta_label}</Text>
-                      <MaterialIcons name="chevron-right" size={16} color="#3b82f6" />
-                    </TouchableOpacity>
-                  )}
-                </Animated.View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {steps.length === 0 && !isGenerating && (
-          <View style={styles.emptyContainer}>
-            <MaterialIcons name="map" size={48} color={theme.colors.border} />
-            <Text style={styles.emptyText}>Pick a goal and generate your personalized journey path.</Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: theme.colors.backgroundPrimary,
   },
+  screen: {
+    flex: 1,
+    backgroundColor: theme.colors.backgroundPrimary,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 112,
+  },
   header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-    backgroundColor: theme.colors.surfaceAlt,
+    paddingTop: 12,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 30,
+    fontWeight: '800',
     color: theme.colors.textPrimary,
-    marginBottom: 4,
+    letterSpacing: -0.6,
   },
   subtitle: {
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 22,
     color: theme.colors.textSecondary,
+    maxWidth: 320,
   },
-  graphViewButton: {
+  searchSection: {
+    marginBottom: 18,
+  },
+  searchShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: theme.colors.border,
+    minHeight: 66,
+    paddingLeft: 16,
+    paddingRight: 10,
+    ...shadows.card,
   },
-  graphViewButtonText: {
-    color: '#3b82f6',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
+  searchIcon: {
+    marginRight: 10,
   },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
+  searchInput: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    paddingVertical: 18,
   },
-  configSection: {
-    backgroundColor: '#1e293b',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+  submitButton: {
+    width: 42,
+    height: 42,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#f1f5f9',
-    marginBottom: 16,
-  },
-  goalGrid: {
+  promptRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-  },
-  goalButton: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  activeGoalButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: '#3b82f6',
-  },
-  goalButtonText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeGoalButtonText: {
-    color: '#3b82f6',
-  },
-  input: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 16,
-    color: '#f1f5f9',
-    fontSize: 14,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    gap: 12,
-  },
-  generateButton: {
-    flex: 1,
-    backgroundColor: '#3b82f6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  regenerateButton: {
-    backgroundColor: '#1e293b',
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  profileUsageButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  generateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  stepsSection: {
-    marginTop: 8,
-  },
-  stepsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  playButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  playButtonText: {
-    color: '#3b82f6',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  stepWrapper: {
-    flexDirection: 'row',
-  },
-  stepConnectorLineContainer: {
-    width: 40,
-    alignItems: 'center',
-  },
-  stepConnectorLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 2,
-    backgroundColor: '#334155',
-  },
-  activeConnectorLine: {
-    backgroundColor: '#3b82f6',
-  },
-  stepMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1e293b',
-    borderWidth: 2,
-    borderColor: '#334155',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-    marginTop: 10,
-  },
-  highlightedMarker: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#0f172a',
-  },
-  completedMarker: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#3b82f6',
-  },
-  stepNumber: {
-    color: '#f1f5f9',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  stepCard: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    marginLeft: 4,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  stepCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  highlightedCard: {
-    borderColor: '#3b82f6',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f8fafc',
-    marginBottom: 4,
-  },
-  buildingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  buildingName: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginLeft: 4,
-  },
-  shortReason: {
-    fontSize: 14,
-    color: '#cbd5e1',
-    lineHeight: 20,
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  skillPill: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  skillPillText: {
-    color: '#60a5fa',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
   },
-  ctaButtonText: {
-    color: '#3b82f6',
-    fontSize: 14,
-    fontWeight: '700',
-    marginRight: 4,
+  promptChip: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  emptyContainer: {
+  promptChipText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  canvasSpacer: {
+    flex: 1,
+  },
+  toggleDock: {
+    marginTop: 10,
+    padding: 6,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...shadows.card,
+  },
+  toggleTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activeToggle: {
+    flex: 1,
+    borderRadius: theme.radius.pill,
+    padding: 1,
+    ...shadows.glow,
+  },
+  toggleButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
+    borderRadius: theme.radius.pill,
+    minHeight: 42,
   },
-  emptyText: {
-    color: '#64748b',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 24,
+  activeToggleText: {
+    color: theme.colors.textOnAccent,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  inactiveToggle: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: theme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  inactiveToggleText: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  toggleDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: theme.colors.border,
+    marginVertical: 6,
   },
 });
