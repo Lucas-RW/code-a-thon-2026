@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 interface ToastProps {
   message: string;
@@ -41,16 +43,26 @@ export default function Toast({ message, type = 'error', visible, onHide }: Toas
     });
   };
 
+  const gradientColors: [string, string, ...string[]] =
+    type === 'error'
+      ? [theme.colors.dangerSurface, '#7F1D1D']
+      : type === 'success'
+        ? ['#123524', '#166534']
+        : [...theme.gradients.accent];
+
   return (
-    <Animated.View style={[
-      styles.container, 
-      { transform: [{ translateY }] }, 
-      type === 'error' ? styles.error : type === 'success' ? styles.success : styles.info
-    ]}>
-      <Text style={styles.message}>{message}</Text>
+    <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
+        <Text style={styles.message}>{message}</Text>
       <TouchableOpacity onPress={hide} style={styles.closeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <Text style={styles.closeText}>×</Text>
       </TouchableOpacity>
+      </LinearGradient>
     </Animated.View>
   );
 }
@@ -61,26 +73,19 @@ const styles = StyleSheet.create({
     top: 0,
     left: 20,
     right: 20,
-    padding: 16,
     borderRadius: 12,
+    zIndex: 9999,
+    overflow: 'hidden',
+    ...shadows.glow,
+  },
+  gradient: {
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 9999,
-    elevation: 10,
-    boxShadow: '0px 4px 5px rgba(0, 0, 0, 0.3)',
-  },
-  error: {
-    backgroundColor: '#ef4444',
-  },
-  info: {
-    backgroundColor: '#3b82f6',
-  },
-  success: {
-    backgroundColor: '#10b981',
   },
   message: {
-    color: '#fff',
+    color: theme.colors.textOnAccent,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
@@ -91,9 +96,9 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   closeText: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
-    opacity: 0.8,
+    color: theme.colors.textOnAccent,
+    fontSize: 20,
+    fontWeight: '700',
+    opacity: 0.85,
   },
 });

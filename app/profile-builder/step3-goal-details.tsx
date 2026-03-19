@@ -5,6 +5,9 @@ import { useProfileBuilder } from '@/context/ProfileBuilderContext';
 import * as Api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
+import type { GoalType } from '@/lib/api';
 
 export default function Step3GoalDetails() {
   const { profileData, updateGoalPreferences } = useProfileBuilder();
@@ -22,7 +25,7 @@ export default function Step3GoalDetails() {
         major: profileData.major,
         is_first_gen: profileData.is_first_gen,
         is_transfer: profileData.is_transfer,
-        goals: profileData.goals,
+        goals: profileData.goals as GoalType[],
         goal_preferences: profileData.goal_preferences,
       });
       await refreshProfile();
@@ -138,7 +141,7 @@ export default function Step3GoalDetails() {
   );
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={[...theme.gradients.hero]} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.stepText}>Step 3 of 3</Text>
@@ -157,21 +160,22 @@ export default function Step3GoalDetails() {
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.nextButton, loading && styles.buttonDisabled]} 
+          style={[styles.buttonShell, loading && styles.buttonDisabled]} 
           onPress={handleFinish}
           disabled={loading}
         >
-          <Text style={styles.nextButtonText}>{loading ? 'Saving...' : 'Finish'}</Text>
+          <LinearGradient colors={[...theme.gradients.accent]} style={styles.nextButton}>
+            <Text style={styles.nextButtonText}>{loading ? 'Saving...' : 'Finish'}</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollContent: {
     padding: 24,
@@ -181,7 +185,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   stepText: {
-    color: '#aaa',
+    color: theme.colors.accentTertiary,
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -191,25 +195,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
   section: {
-    backgroundColor: '#111',
-    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 22,
     padding: 24,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: theme.colors.border,
+    ...shadows.card,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 20,
   },
   inputContainer: {
@@ -218,16 +223,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
+    borderColor: theme.colors.border,
+    borderRadius: 14,
     padding: 16,
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 15,
   },
   chipContainer: {
@@ -239,28 +244,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
   },
   chipActive: {
-    backgroundColor: '#fff',
-    borderColor: '#fff',
+    backgroundColor: theme.colors.accentWash,
+    borderColor: theme.colors.borderStrong,
   },
   chipText: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: '#000',
+    color: theme.colors.accentTertiary,
   },
   footer: {
     flexDirection: 'row',
     padding: 24,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: theme.colors.border,
     gap: 12,
   },
   backButton: {
@@ -269,25 +274,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   backButtonText: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
-  nextButton: {
+  buttonShell: {
     flex: 2,
-    backgroundColor: '#fff',
-    padding: 18,
     borderRadius: 12,
+    overflow: 'hidden',
+    ...shadows.glow,
+  },
+  nextButton: {
+    padding: 18,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.3,
   },
   nextButtonText: {
-    color: '#000',
+    color: theme.colors.textOnAccent,
     fontSize: 16,
     fontWeight: '700',
   },

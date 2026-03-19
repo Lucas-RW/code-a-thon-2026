@@ -6,6 +6,7 @@ import { ToastProvider } from '@/context/ToastContext';
 import { ActivityIndicator, View } from 'react-native';
 
 import { GraphProvider } from '@/context/GraphContext';
+import { theme } from '@/lib/theme';
 
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { accessToken, userProfile, isLoading, isProfileComplete } = useAuth();
@@ -22,8 +23,8 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.backgroundPrimary }}>
+        <ActivityIndicator size="large" color={theme.colors.accentTertiary} />
       </View>
     );
   }

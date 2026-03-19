@@ -19,6 +19,7 @@ import { useToast } from '@/context/ToastContext';
 import LoadingState from '@/components/LoadingState';
 import { sendGraphMessage } from '@/lib/graphMessaging';
 import { useGraph } from '@/context/GraphContext';
+import { theme } from '@/lib/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -144,7 +145,7 @@ export default function GoldenPathScreen() {
             style={styles.graphViewButton}
             onPress={() => router.push('/graph')}
           >
-            <MaterialIcons name="hub" size={20} color="#3b82f6" />
+            <MaterialIcons name="hub" size={20} color={theme.colors.accentTertiary} />
             <Text style={styles.graphViewButtonText}>Visual Graph</Text>
           </TouchableOpacity>
         </View>
@@ -181,7 +182,7 @@ export default function GoldenPathScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. I want to build a portfolio for UX design"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={theme.colors.textMuted}
             value={goalText}
             onChangeText={setGoalText}
             multiline
@@ -198,7 +199,7 @@ export default function GoldenPathScreen() {
               disabled={isGenerating}
             >
               {isGenerating ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.colors.textOnAccent} />
               ) : (
                 <>
                   <MaterialIcons 
@@ -222,7 +223,7 @@ export default function GoldenPathScreen() {
                   showToast('Re-applied profile goals', 'info');
                 }}
               >
-                <MaterialIcons name="person-outline" size={18} color="#94a3b8" />
+                <MaterialIcons name="person-outline" size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -303,7 +304,7 @@ export default function GoldenPathScreen() {
 
         {steps.length === 0 && !isGenerating && (
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="map" size={48} color="#334155" />
+            <MaterialIcons name="map" size={48} color={theme.colors.border} />
             <Text style={styles.emptyText}>Pick a goal and generate your personalized journey path.</Text>
           </View>
         )}
@@ -315,23 +316,23 @@ export default function GoldenPathScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   header: {
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 24,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.surfaceAlt,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
   },
   graphViewButton: {
     flexDirection: 'row',

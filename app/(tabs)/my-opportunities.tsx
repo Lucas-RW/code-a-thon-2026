@@ -7,6 +7,7 @@ import { fetchInterestedOpportunities, InterestedOpportunity, GoalType, GOAL_OPT
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
+import { shadows, theme } from '@/lib/theme';
 
 const GOAL_PERSIST_KEY = 'campuslens_selected_goal';
 
@@ -94,7 +95,7 @@ export default function MyOpportunitiesScreen() {
         </View>
         
         <View style={styles.buildingRow}>
-          <MaterialIcons name="business" size={16} color="#94a3b8" />
+          <MaterialIcons name="business" size={16} color={theme.colors.textSecondary} />
           <Text style={styles.buildingName}>
             {item.building_name} {item.building_short_name ? `(${item.building_short_name})` : ''}
           </Text>
@@ -182,7 +183,7 @@ export default function MyOpportunitiesScreen() {
 
       {isFallbackMode && (
         <View style={styles.fallbackNote}>
-          <MaterialIcons name="info-outline" size={14} color="#94a3b8" />
+          <MaterialIcons name="info-outline" size={14} color={theme.colors.textSecondary} />
           <Text style={styles.fallbackNoteText}>
             No items tagged for this goal yet. Showing all interests instead.
           </Text>
@@ -207,35 +208,35 @@ export default function MyOpportunitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: theme.colors.backgroundPrimary },
   center: { justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 24, backgroundColor: '#1e293b', paddingTop: 60, paddingBottom: 24, paddingHorizontal: 24 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#f8fafc', marginBottom: 4 },
-  subtitle: { fontSize: 16, color: '#94a3b8' },
+  header: { padding: 24, backgroundColor: theme.colors.surfaceAlt, paddingTop: 60, paddingBottom: 24, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  title: { fontSize: 28, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 16, color: theme.colors.textSecondary },
   listContent: { padding: 16, paddingBottom: 40 },
-  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#334155', elevation: 2, boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)' },
+  card: { backgroundColor: theme.colors.surface, borderRadius: 18, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border, ...shadows.card },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#f1f5f9', flex: 1, marginRight: 8 },
-  badgeContainer: { backgroundColor: '#3b82f620', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f650', alignSelf: 'flex-start' },
-  badgeText: { color: '#60a5fa', fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
+  cardTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, flex: 1, marginRight: 8 },
+  badgeContainer: { backgroundColor: theme.colors.accentWash, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.accentLine, alignSelf: 'flex-start' },
+  badgeText: { color: theme.colors.info, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   buildingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  buildingName: { fontSize: 14, color: '#94a3b8', marginLeft: 6, fontWeight: '500' },
-  cardDescription: { fontSize: 14, color: '#cbd5e1', lineHeight: 20, marginBottom: 16 },
+  buildingName: { fontSize: 14, color: theme.colors.textSecondary, marginLeft: 6, fontWeight: '500' },
+  cardDescription: { fontSize: 14, color: theme.colors.textSecondary, lineHeight: 20, marginBottom: 16 },
   tagContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
-  tag: { backgroundColor: '#334155', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginRight: 6, marginBottom: 6 },
-  tagText: { color: '#e2e8f0', fontSize: 12, fontWeight: '500' },
-  viewBuildingButton: { borderWidth: 1, borderColor: '#3b82f6', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 'auto' },
-  viewBuildingText: { color: '#3b82f6', fontWeight: '600' },
-  errorText: { color: '#ef4444', fontSize: 16, marginBottom: 16, textAlign: 'center' },
-  retryButton: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#3b82f6', borderRadius: 8 },
+  tag: { backgroundColor: theme.colors.surfaceMuted, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginRight: 6, marginBottom: 6, borderWidth: 1, borderColor: theme.colors.border },
+  tagText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '500' },
+  viewBuildingButton: { borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 'auto', backgroundColor: theme.colors.accentWash },
+  viewBuildingText: { color: theme.colors.accentTertiary, fontWeight: '600' },
+  errorText: { color: theme.colors.error, fontSize: 16, marginBottom: 16, textAlign: 'center' },
+  retryButton: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: theme.colors.accentSecondary, borderRadius: 8 },
   retryButtonText: { color: '#ffffff', fontWeight: 'bold' },
   emptyContainer: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 32 },
-  emptyText: { color: '#64748b', fontSize: 16, textAlign: 'center', lineHeight: 24 },
+  emptyText: { color: theme.colors.textMuted, fontSize: 16, textAlign: 'center', lineHeight: 24 },
   goalSelectorContainer: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: theme.colors.border,
   },
   goalSelector: {
     paddingHorizontal: 24,
@@ -245,25 +246,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginRight: 10,
     borderRadius: 20,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: theme.colors.border,
   },
   activeGoalChip: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderColor: '#3b82f6',
+    backgroundColor: theme.colors.accentWash,
+    borderColor: theme.colors.borderStrong,
   },
   goalChipText: {
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
   activeGoalChipText: {
-    color: '#3b82f6',
+    color: theme.colors.accentTertiary,
   },
   goalMicrocopy: {
     fontSize: 12,
-    color: '#64748b',
+    color: theme.colors.textMuted,
     paddingHorizontal: 24,
     marginTop: 6,
     fontStyle: 'italic',
@@ -271,16 +272,16 @@ const styles = StyleSheet.create({
   fallbackNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.surface,
     margin: 16,
     marginBottom: 0,
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: theme.colors.border,
   },
   fallbackNoteText: {
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
     fontSize: 12,
     marginLeft: 6,
   },

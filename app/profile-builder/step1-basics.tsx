@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useProfileBuilder } from '@/context/ProfileBuilderContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Grad'];
 
@@ -18,7 +20,7 @@ export default function Step1Basics() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={[...theme.gradients.hero]} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.stepText}>Step 1 of 3</Text>
@@ -32,7 +34,7 @@ export default function Step1Basics() {
             <TextInput
               style={styles.input}
               placeholder="How should we call you?"
-              placeholderTextColor="#666"
+              placeholderTextColor={theme.colors.textMuted}
               value={profileData.name}
               onChangeText={(text) => updateProfileData({ name: text })}
             />
@@ -75,8 +77,8 @@ export default function Step1Basics() {
             <Switch
               value={profileData.is_first_gen}
               onValueChange={(v) => updateProfileData({ is_first_gen: v })}
-              trackColor={{ false: '#333', true: '#fff' }}
-              thumbColor={profileData.is_first_gen ? '#000' : '#f4f3f4'}
+              trackColor={{ false: theme.colors.border, true: theme.colors.accentSecondary }}
+              thumbColor={profileData.is_first_gen ? theme.colors.textPrimary : '#f4f3f4'}
             />
           </View>
 
@@ -88,8 +90,8 @@ export default function Step1Basics() {
             <Switch
               value={profileData.is_transfer}
               onValueChange={(v) => updateProfileData({ is_transfer: v })}
-              trackColor={{ false: '#333', true: '#fff' }}
-              thumbColor={profileData.is_transfer ? '#000' : '#f4f3f4'}
+              trackColor={{ false: theme.colors.border, true: theme.colors.accentSecondary }}
+              thumbColor={profileData.is_transfer ? theme.colors.textPrimary : '#f4f3f4'}
             />
           </View>
         </View>
@@ -97,20 +99,21 @@ export default function Step1Basics() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.nextButton, (!profileData.name || !profileData.year || !profileData.major) && styles.buttonDisabled]} 
+          style={[styles.buttonShell, (!profileData.name || !profileData.year || !profileData.major) && styles.buttonDisabled]} 
           onPress={handleNext}
         >
-          <Text style={styles.nextButtonText}>Continue</Text>
+          <LinearGradient colors={[...theme.gradients.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.nextButton}>
+            <Text style={styles.nextButtonText}>Continue</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollContent: {
     padding: 24,
@@ -120,7 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   stepText: {
-    color: '#aaa',
+    color: theme.colors.accentTertiary,
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -130,15 +133,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
   form: {
     marginTop: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 20,
+    ...shadows.card,
   },
   inputContainer: {
     marginBottom: 24,
@@ -146,16 +155,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
+    borderColor: theme.colors.border,
+    borderRadius: 14,
     padding: 16,
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 16,
   },
   chipContainer: {
@@ -167,21 +176,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
   },
   chipActive: {
-    backgroundColor: '#fff',
-    borderColor: '#fff',
+    backgroundColor: theme.colors.accentWash,
+    borderColor: theme.colors.borderStrong,
   },
   chipText: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: '#000',
+    color: theme.colors.accentTertiary,
   },
   switchRow: {
     flexDirection: 'row',
@@ -189,35 +198,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: theme.colors.border,
   },
   switchLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
   switchSublabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   footer: {
     padding: 24,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: theme.colors.border,
+  },
+  buttonShell: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    ...shadows.glow,
   },
   nextButton: {
-    backgroundColor: '#fff',
     padding: 18,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.3,
   },
   nextButtonText: {
-    color: '#000',
+    color: theme.colors.textOnAccent,
     fontSize: 16,
     fontWeight: '700',
   },

@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } fr
 import { useAuth } from '@/context/AuthContext';
 import { useFocusEffect, useRouter } from 'expo-router';
 import LoadingState from '@/components/LoadingState';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { userProfile, refreshProfile, logout, isLoading } = useAuth();
@@ -35,9 +37,9 @@ export default function ProfileScreen() {
             delayLongPress={2000}
             activeOpacity={0.8}
           >
-            <View style={styles.avatarPlaceholder}>
+            <LinearGradient colors={[...theme.gradients.accent]} style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
           <Text style={styles.name}>{userProfile.name}</Text>
           <Text style={styles.subtitle}>{userProfile.major} • {userProfile.year}</Text>
@@ -82,7 +84,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   scrollContent: {
     padding: 24,
@@ -91,7 +93,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   header: {
     alignItems: 'center',
@@ -101,25 +103,25 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#fff',
+    ...shadows.glow,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
   },
   avatarText: {
-    color: '#000',
+    color: theme.colors.textOnAccent,
     fontSize: 42,
     fontWeight: '800',
   },
   name: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#888',
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   section: {
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 16,
     letterSpacing: 0.5,
   },
@@ -138,20 +140,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   goalChip: {
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
   goalChipText: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
   emptyText: {
-    color: '#444',
+    color: theme.colors.textMuted,
     fontStyle: 'italic',
   },
   statsRow: {
@@ -160,22 +162,23 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: theme.colors.border,
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
+    ...shadows.card,
   },
   statValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textMuted,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -184,16 +187,16 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: theme.colors.border,
   },
   logoutText: {
-    color: '#ff4444',
+    color: theme.colors.error,
     fontSize: 16,
     fontWeight: '700',
   },
   errorText: {
-    color: '#fff',
+    color: theme.colors.textPrimary,
   },
 });

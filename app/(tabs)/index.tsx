@@ -5,6 +5,7 @@ import { fetchBuildings, BuildingSummary } from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { shadows, theme } from '@/lib/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function HomeScreen() {
     >
       <View style={styles.cardHeader}>
         <Text style={styles.name}>{item.name}</Text>
-        <MaterialIcons name="chevron-right" size={20} color="#64748b" />
+        <MaterialIcons name="chevron-right" size={20} color={theme.colors.textMuted} />
       </View>
       {item.short_name && <Text style={styles.shortName}>{item.short_name}</Text>}
       {item.description && (
@@ -87,41 +88,37 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   header: {
     padding: 24,
     paddingTop: 40,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.surfaceAlt,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: theme.colors.border,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
   },
   listContent: {
     padding: 16,
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderColor: theme.colors.border,
+    ...shadows.card,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -132,22 +129,22 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     flex: 1,
   },
   shortName: {
     fontSize: 14,
-    color: '#3b82f6',
+    color: theme.colors.accentTertiary,
     fontWeight: '600',
     marginBottom: 8,
   },
   description: {
     fontSize: 14,
-    color: '#cbd5e1',
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
   emptyText: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: 40,
     fontSize: 16,

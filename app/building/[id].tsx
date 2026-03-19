@@ -22,6 +22,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
+import { theme } from '@/lib/theme';
 
 export interface BuildingDetail {
   id: string;
@@ -342,7 +343,7 @@ export default function BuildingDetailScreen() {
         <>
           {isFallbackMode && (
             <View style={styles.fallbackNote}>
-              <MaterialIcons name="info-outline" size={14} color="#94a3b8" />
+              <MaterialIcons name="info-outline" size={14} color={theme.colors.textSecondary} />
               <Text style={styles.fallbackNoteText}>
                 No items tagged for this goal yet. Showing all {activeTab.toLowerCase()} instead.
               </Text>
@@ -368,21 +369,21 @@ export default function BuildingDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.backgroundPrimary,
   },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorText: {
-    color: '#ef4444',
+    color: theme.colors.error,
     fontSize: 16,
     marginBottom: 16,
   },
   retryButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#3b82f6',
+    backgroundColor: theme.colors.accentSecondary,
     borderRadius: 8,
   },
   retryButtonText: {
@@ -391,17 +392,17 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 24,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.surfaceAlt,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: theme.colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },

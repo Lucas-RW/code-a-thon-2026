@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { shadows, theme } from '@/lib/theme';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -39,68 +41,73 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Join CampusLens</Text>
-          <Text style={styles.subtitle}>Start your visual journey</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="student@example.com"
-              placeholderTextColor="#666"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+      <LinearGradient colors={[...theme.gradients.hero]} style={styles.gradient}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>New Explorer</Text>
+            <Text style={styles.title}>Join CampusLens</Text>
+            <Text style={styles.subtitle}>Start your visual journey through campus opportunities.</Text>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="At least 6 characters"
-              placeholderTextColor="#666"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="student@example.com"
+                placeholderTextColor={theme.colors.textMuted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Repeat your password"
-              placeholderTextColor="#666"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="At least 6 characters"
+                placeholderTextColor={theme.colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleRegister}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirm Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Repeat your password"
+                placeholderTextColor={theme.colors.textMuted}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+              />
+            </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <Link href={"/auth/login" as any} asChild>
-              <TouchableOpacity>
-                <Text style={styles.linkText}>Sign In</Text>
-              </TouchableOpacity>
-            </Link>
+            <TouchableOpacity 
+              style={[styles.buttonShell, loading && styles.buttonDisabled]} 
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              <LinearGradient colors={[...theme.gradients.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.button}>
+                <Text style={styles.buttonText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <Link href={"/auth/login" as any} asChild>
+                <TouchableOpacity>
+                  <Text style={styles.linkText}>Sign In</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
@@ -108,7 +115,10 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.backgroundPrimary,
+  },
+  gradient: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -117,21 +127,35 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 40,
-    alignItems: 'center',
+  },
+  eyebrow: {
+    color: theme.colors.accentTertiary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 10,
   },
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     marginTop: 8,
+    maxWidth: 300,
   },
   form: {
     width: '100%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 22,
+    ...shadows.card,
   },
   inputContainer: {
     marginBottom: 20,
@@ -139,31 +163,35 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.textPrimary,
     marginBottom: 8,
     marginLeft: 4,
   },
   input: {
-    backgroundColor: '#111',
+    backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
+    borderColor: theme.colors.border,
+    borderRadius: 14,
     padding: 16,
-    color: '#fff',
+    color: theme.colors.textPrimary,
     fontSize: 16,
   },
+  buttonShell: {
+    marginTop: 20,
+    borderRadius: 14,
+    overflow: 'hidden',
+    ...shadows.glow,
+  },
   button: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 18,
     alignItems: 'center',
-    marginTop: 20,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: '#000',
+    color: theme.colors.textOnAccent,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -173,11 +201,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   footerText: {
-    color: '#aaa',
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
   linkText: {
-    color: '#fff',
+    color: theme.colors.accentTertiary,
     fontSize: 14,
     fontWeight: '700',
   },
