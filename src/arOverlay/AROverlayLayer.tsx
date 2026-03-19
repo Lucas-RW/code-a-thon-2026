@@ -5,7 +5,7 @@ import { Dimensions, StyleSheet, View, Pressable } from 'react-native';
 import type { ARBuilding, ARBuildingUIState } from './types';
 import { normalizedToPixel, themeColorForBuildingType } from './utils';
 import EyeIcon from './EyeIcon';
-import BuildingARCard from './BuildingARCard';
+import BuildingARDetailSheet from './BuildingARDetailSheet';
 
 interface AROverlayLayerProps {
   /** The current set of buildings to display. */
@@ -106,7 +106,7 @@ export default function AROverlayLayer({ buildings }: AROverlayLayerProps) {
         <>
           {/* Dim background briefly or catch taps */}
           <Pressable style={styles.backdrop} onPress={handleCloseCard} />
-          <BuildingARCard
+          <BuildingARDetailSheet
             building={selectedCard}
             onClose={handleCloseCard}
           />

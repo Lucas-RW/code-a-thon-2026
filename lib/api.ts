@@ -138,6 +138,17 @@ export interface BuildingSummary {
   name: string;
   short_name?: string;
   description?: string;
+  image_url?: string;
+  departments?: string[];
+  professors?: {
+    id: string;
+    name: string;
+    department: string;
+    focus?: string;
+    email?: string;
+    linkedin_url?: string;
+    image_url?: string;
+  }[];
   lat: number;
   lng: number;
 }
@@ -160,12 +171,16 @@ export interface Opportunity {
   type: string;
   title: string;
   description?: string;
+  summary?: string;
   professor?: string;
+  professor_id?: string;
   tags: string[];
   contact?: string;
   url?: string;
   deadline?: string;
   goal_tags?: GoalType[];
+  hourly_commitment?: string;
+  pay?: string;
 }
 
 export async function fetchBuildingOpportunities(buildingId: string): Promise<Opportunity[]> {
