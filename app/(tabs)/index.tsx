@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity } from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
+import VoyagerOverlay from '@/components/VoyagerOverlay';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { shadows, theme } from '@/lib/theme';
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [interests, setInterests] = React.useState<InterestedOpportunity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [voyagerBuilding, setVoyagerBuilding] = React.useState<BuildingSummary | null>(null);
 
   const loadHome = React.useCallback(async () => {
     setIsLoading(true);
@@ -260,10 +262,25 @@ export default function HomeScreen() {
               <Text style={styles.feedSubtitle}>{item.subtitle}</Text>
               <Text style={styles.feedMeta}>{item.meta}</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={theme.colors.textMuted} />
+            <TouchableOpacity 
+              onPress={() => {
+                const b = buildings.find(b => b.id === item.buildingId);
+                if (b) setVoyagerBuilding(b);
+              }}
+              style={styles.voyagerTrigger}
+            >
+              <MaterialIcons name="auto-fix-high" size={20} color={theme.colors.accentTertiary} />
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {voyagerBuilding && (
+        <VoyagerOverlay 
+          building={voyagerBuilding}
+          onClose={() => setVoyagerBuilding(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -494,5 +511,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+  },
+  voyagerTrigger: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
   },
 });

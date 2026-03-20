@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import LoadingState from '@/components/LoadingState';
+import SkillTree from '@/components/SkillTree';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { fetchInterestedOpportunities, GoalType, InterestedOpportunity } from '@/lib/api';
@@ -31,10 +32,10 @@ const STATUS_STORAGE_KEY = 'campuslens_profile_opportunity_statuses';
 const STATUS_ORDER: OpportunityStatus[] = ['saved', 'viewed', 'applied'];
 
 const GOAL_SKILL_MAP: Record<GoalType, string[]> = {
-  career: ['Resume Building', 'Interview Prep', 'Networking'],
-  research: ['Research Methods', 'Literature Review', 'Lab Collaboration'],
-  academic_aid: ['Study Planning', 'Tutoring', 'Course Strategy'],
-  social_support: ['Community Building', 'Leadership', 'Campus Involvement'],
+  career: ['System Architecture', 'API Design', 'Distributed Systems', 'Cloud Infrastructure'],
+  research: ['Advanced Calculus', 'Stochastic Modeling', 'ML Research', 'Logic'],
+  academic_aid: ['Pedagogical Strategy', 'Curriculum Mapping', 'Applied Statistics', 'Advanced Theory'],
+  social_support: ['Conflict Resolution', 'Community Organizing', 'DEI Frameworks', 'Event Logistics'],
 };
 
 const GOAL_INTEREST_MAP: Record<GoalType, string[]> = {
@@ -112,10 +113,17 @@ export default function ProfileScreen() {
   const derivedSkills = React.useMemo(() => {
     if (!userProfile) return [];
 
+    const isGenericSkill = (skill: string) => {
+      const generic = ['professional', 'networking', 'career', 'teamwork', 'leadership', 'communication', 'interpersonal', 'soft skills'];
+      return generic.includes(skill.toLowerCase());
+    };
+
     const fromGoals = userProfile.goals.flatMap((goal) => GOAL_SKILL_MAP[goal] ?? []);
     const fromOpportunities = opportunities.flatMap((item) => item.tags ?? []);
 
-    return Array.from(new Set([...fromGoals, ...fromOpportunities])).slice(0, 8);
+    return Array.from(new Set([...fromGoals, ...fromOpportunities]))
+      .filter(s => !isGenericSkill(s))
+      .slice(0, 8);
   }, [opportunities, userProfile]);
 
   const derivedInterests = React.useMemo(() => {
@@ -285,7 +293,7 @@ export default function ProfileScreen() {
             <Text style={styles.graphPreviewMeta}>{graphSize} total connections</Text>
           </View>
           <View style={styles.graphPlaceholder}>
-              // Replace with actual graph visualization component in the future
+            <SkillTree acquiredSkills={derivedSkills} acquiredOnly={true} />
           </View>
         </View>
 
@@ -594,9 +602,7 @@ const styles = StyleSheet.create({
   graphPlaceholder: {
     height: 124,
     borderRadius: 20,
-    backgroundColor: theme.colors.backgroundTertiary,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
     marginBottom: 14,
     justifyContent: 'center',
     alignItems: 'center',

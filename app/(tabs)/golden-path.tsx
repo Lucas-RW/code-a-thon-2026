@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +12,11 @@ import {
 } from 'react-native';
 
 import { useToast } from '@/context/ToastContext';
+import { useGraph } from '@/context/GraphContext';
+import { useAuth } from '@/context/AuthContext';
+import SkillTree from '@/components/SkillTree';
+import SimpleWebView from '@/components/SimpleWebView';
+import { fetchPathfind, GoalType, PathStep } from '@/lib/api';
 import { shadows, theme } from '@/lib/theme';
 
 type GraphMode = 'skills' | 'network';
@@ -23,19 +29,124 @@ const SUGGESTED_PROMPTS = [
 
 export default function GoldenPathScreen() {
   const { showToast } = useToast();
+  const { userProfile } = useAuth();
+  const { pathData, setPathData, setGlobalGoalText } = useGraph();
+  const [alternatives, setAlternatives] = React.useState<PathStep[]>([]);
   const [query, setQuery] = React.useState('');
-  const [graphMode, setGraphMode] = React.useState<GraphMode>('skills');
+  const [graphMode, setGraphMode] = React.useState<'skills' | 'network'>('network');
+  const [selectedNodeIds, setSelectedNodeIds] = React.useState<Set<string>>(new Set());
 
-  const submitPrompt = React.useCallback(() => {
+  // Initialize all nodes as selected when path changes
+  React.useEffect(() => {
+    if (pathData.length > 0) {
+      const allIds = new Set(pathData.map(step => `opp:${step.opportunity_id || step.opportunity_title}`));
+      setSelectedNodeIds(allIds);
+    }
+  }, [pathData]);
+
+  const onGraphMessage = (event: any) => {
+    try {
+      const data = typeof event.nativeEvent.data === 'string' 
+        ? JSON.parse(event.nativeEvent.data) 
+        : event.nativeEvent.data;
+        
+      if (data.type === 'TOGGLE_NODE') {
+        const newSelected = new Set(selectedNodeIds);
+        if (data.selected) {
+          newSelected.add(data.nodeId);
+        } else {
+          newSelected.delete(data.nodeId);
+        }
+        setSelectedNodeIds(newSelected);
+      }
+    } catch (e) {
+      console.error('Error parsing graph message', e);
+    }
+  };
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const submitPrompt = React.useCallback(async () => {
     const trimmedQuery = query.trim();
-
     if (!trimmedQuery) {
       showToast('Enter a prompt to explore the graph.', 'info');
       return;
     }
 
-    showToast('Graph search is simulated for now. Canvas is coming next.', 'info');
-  }, [query, showToast]);
+    setIsGenerating(true);
+    try {
+      // For now, we'll use the first goal of the user or 'career' as default
+      const goalType = (userProfile?.goals[0] as GoalType) || 'career';
+      const response = await fetchPathfind({ 
+        goal_type: goalType, 
+        goal_text: trimmedQuery 
+      });
+      
+      setPathData(response.steps);
+      setAlternatives(response.alternatives || []);
+      
+      // Initialize selection: default to all main steps selected
+      const mainIds = new Set(response.steps.map(s => `opp:${s.opportunity_id || s.opportunity_title}`));
+      setSelectedNodeIds(mainIds);
+
+      setGlobalGoalText(trimmedQuery);
+      showToast('Career path generated!', 'success');
+    } catch (err: any) {
+      if (err.status === 401) {
+        showToast('Session expired. Please log out and back in.', 'info');
+      } else {
+        showToast('Failed to generate path. Please try again.', 'error');
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [query, showToast, userProfile, setPathData, setGlobalGoalText]);
+
+  const isGenericSkill = (skill: string) => {
+    const generic = ['professional', 'networking', 'career', 'teamwork', 'leadership', 'communication', 'interpersonal', 'soft skills'];
+    return generic.includes(skill.toLowerCase());
+  };
+
+  const acquiredSkills = React.useMemo(() => {
+    if (!userProfile) return ['Data Structures', 'Git Version Control', 'Statistical Analysis'];
+    
+    // Extract skills from goals and profile
+    const goalSkills = userProfile.goals.flatMap(g => {
+      if (g === 'career') return ['Software Engineering', 'System Design'];
+      if (g === 'research') return ['Python', 'Data Science', 'Machine Learning'];
+      return [];
+    });
+    
+    // Simple filter to keep it relevant to query if possible
+    const allAcquired = Array.from(new Set([...goalSkills, 'Git', 'Data Structures']));
+    const q = query.toLowerCase();
+    
+    // Sort by relevance to query
+    return allAcquired
+      .filter(s => !isGenericSkill(s))
+      .sort((a, b) => {
+        const aMatch = q.includes(a.toLowerCase());
+        const bMatch = q.includes(b.toLowerCase());
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return 0;
+      })
+      .slice(0, 6);
+  }, [userProfile, query]);
+
+  const plannedSkills = React.useMemo(() => {
+    const allSkills = pathData.flatMap(step => step.skills || []);
+    return Array.from(new Set(allSkills)).filter(s => !isGenericSkill(s));
+  }, [pathData]);
+
+  const uniquePathData = React.useMemo(() => {
+    const seen = new Set();
+    return pathData.filter(step => {
+      const id = step.opportunity_id || step.opportunity_title;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [pathData]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -82,7 +193,69 @@ export default function GoldenPathScreen() {
           </View>
         </View>
 
-        <View style={styles.canvasSpacer} />
+        <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
+          <View style={styles.canvasArea}>
+            {graphMode === 'skills' ? (
+              <SkillTree 
+                acquiredSkills={acquiredSkills} 
+                plannedSkills={plannedSkills}
+                acquiredOnly={false}
+              />
+            ) : (
+              <SimpleWebView 
+                source={{ uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/assets/graph/index.html` }}
+                path={pathData}
+                alternatives={alternatives}
+                onMessage={onGraphMessage}
+              />
+            )}
+          </View>
+
+          {(uniquePathData.length > 0 || alternatives.length > 0) && (
+            <View style={styles.milestoneSection}>
+              <Text style={styles.milestoneTitle}>Your Journey Milestones</Text>
+              {(() => {
+                const combined = [...uniquePathData, ...alternatives];
+                const seenIds = new Set();
+                return combined
+                  .filter((step) => {
+                    const oId = step.opportunity_id || step.opportunity_title;
+                    if (seenIds.has(oId)) return false;
+                    const oppId = `opp:${oId}`;
+                    const altId = `alt:${oId}`;
+                    const isSelected = selectedNodeIds.has(oppId) || selectedNodeIds.has(altId);
+                    if (isSelected) {
+                      seenIds.add(oId);
+                      return true;
+                    }
+                    return false;
+                  })
+                  .sort((a, b) => (a.order || 0) - (b.order || 0))
+                  .map((step, idx) => (
+                    <View key={`${step.opportunity_id}-${idx}`} style={styles.milestoneCard}>
+                      <View style={styles.milestoneHeader}>
+                        <View style={styles.milestoneBadge}>
+                          <Text style={styles.milestoneBadgeText}>{idx + 1}</Text>
+                        </View>
+                        <View style={styles.milestoneHeaderText}>
+                          <Text style={styles.milestoneBuilding}>{step.building_name}</Text>
+                          <Text style={styles.milestoneOpp}>{step.opportunity_title}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.milestoneReason}>{step.short_reason}</Text>
+                      <View style={styles.skillBadgeRow}>
+                        {step.skills.filter((s: string) => !isGenericSkill(s)).map((s: string) => (
+                          <View key={s} style={styles.skillBadge}>
+                            <Text style={styles.skillBadgeText}>{s}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ));
+              })()}
+            </View>
+          )}
+        </ScrollView>
 
         <View style={styles.toggleDock}>
           <View style={styles.toggleTrack}>
@@ -206,11 +379,101 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  canvasSpacer: {
+  scrollArea: {
     flex: 1,
   },
-  toggleDock: {
+  canvasArea: {
+    height: 450,
+    width: '100%',
+    backgroundColor: '#0f172a',
+    borderRadius: 24,
+    marginBottom: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  milestoneSection: {
     marginTop: 10,
+    paddingBottom: 40,
+  },
+  milestoneTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  milestoneCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 12,
+    ...shadows.card,
+  },
+  milestoneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  milestoneBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.accentTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  milestoneBadgeText: {
+    color: theme.colors.backgroundPrimary,
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  milestoneHeaderText: {
+    flex: 1,
+  },
+  milestoneBuilding: {
+    color: theme.colors.accentTertiary,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  milestoneOpp: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  milestoneReason: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  skillBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skillBadge: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  skillBadgeText: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  toggleDock: {
+    marginTop: 0,
+    marginBottom: 10,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,

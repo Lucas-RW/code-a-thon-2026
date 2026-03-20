@@ -95,7 +95,7 @@ export default function AROverlayDemoScreen() {
       )}
 
       {/* ── Debug overlay — remove before shipping ── */}
-      <View style={styles.debugOverlay} pointerEvents="none">
+      <View style={[styles.debugOverlay, { pointerEvents: 'none' }]}>
         <Text style={styles.debugText}>
           lat: {debugLat?.toFixed(6) ?? '…'}{'\n'}
           lng: {debugLng?.toFixed(6) ?? '…'}{'\n'}

@@ -48,10 +48,9 @@ export const shadows = {
       shadowOpacity: 0.28,
       shadowRadius: 24,
     },
-    android: {
-      elevation: 12,
+    default: {
+      boxShadow: '0 10px 24px rgba(109, 94, 247, 0.28)',
     },
-    default: {},
   }),
   card: Platform.select<ViewStyle>({
     ios: {
@@ -63,6 +62,8 @@ export const shadows = {
     android: {
       elevation: 6,
     },
-    default: {},
+    default: {
+      boxShadow: '0 12px 20px rgba(4, 5, 10, 0.35)',
+    },
   }),
 };

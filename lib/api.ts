@@ -241,6 +241,7 @@ export interface PathStep {
 
 export interface PathfindResponse {
   steps: PathStep[];
+  alternatives: PathStep[];
 }
 
 export async function fetchPathfind(params: { goal_type: GoalType; goal_text?: string }): Promise<PathfindResponse> {

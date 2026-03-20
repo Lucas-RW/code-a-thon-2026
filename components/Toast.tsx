@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { shadows, theme } from '@/lib/theme';
 
@@ -17,7 +17,7 @@ export default function Toast({ message, type = 'error', visible, onHide }: Toas
     if (visible) {
       Animated.spring(translateY, {
         toValue: 60,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
       
       const timer = setTimeout(() => {
@@ -28,7 +28,7 @@ export default function Toast({ message, type = 'error', visible, onHide }: Toas
       Animated.timing(translateY, {
         toValue: -100,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [visible, message, type]);

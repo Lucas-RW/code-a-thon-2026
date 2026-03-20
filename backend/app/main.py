@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pymongo import ReturnDocument
 from datetime import datetime
 from bson import ObjectId
@@ -30,6 +31,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
+
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
@@ -347,87 +350,105 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
     """
     from .ai_client import generate_step_reason
     from .graph_updates import slugify
+    import re
     
     try:
         user_id = current_user["id"]
         goal = payload.goal_type
         goal_text = payload.goal_text
         
-        # 1. Identify user's interested history
-        interested_ids = set(current_user.get("interested_opportunities", []))
-        
-        # 2. Heuristic Filtering
         opps_collection = database.get_collection("opportunities")
         bldgs_collection = database.get_collection("buildings")
         
-        levels = [
-            {"types": ["student_org", "event"], "limit": 1},
-            {"types": ["course", "academic_aid"], "limit": 1},
-            {"types": ["research", "job", "course"], "limit": 1},
-        ]
+        # 1. Broad keyword-based search
+        keywords = [re.escape(k) for k in goal_text.split() if len(k) > 1]
+        if not keywords:
+            keywords = [re.escape(goal_text)]
         
-        path_opps = []
+        search_filter = {
+            "$or": [
+                {"title": {"$regex": "|".join(keywords), "$options": "i"}},
+                {"description": {"$regex": "|".join(keywords), "$options": "i"}},
+                {"tags": {"$in": [re.compile(k, re.I) for k in keywords]}}
+            ]
+        }
         
-        for level in levels:
-            query = {
-                "type": {"$in": level["types"]},
-                "$or": [
-                    {"goal_tags": goal},
-                    {"goal_tags": {"$exists": False}},
-                    {"goal_tags": None}
-                ]
-            }
+        # Fetch initial candidates
+        cursor = opps_collection.find(search_filter).limit(15)
+        all_candidates = []
+        async for doc in cursor:
+            all_candidates.append(serialize_mongo_document(doc))
             
-            cursor = opps_collection.find(query).limit(5)
-            candidates = []
-            async for doc in cursor:
-                candidates.append(serialize_mongo_document(doc))
-                
-            if not candidates:
-                cursor = opps_collection.find({"type": {"$in": level["types"]}}).limit(1)
+        # 2. Breadth expansion: If we have some results but < 10, search by tags of found results
+        if all_candidates and len(all_candidates) < 10:
+            found_tags = set()
+            for cand in all_candidates:
+                found_tags.update(cand.get("tags", []))
+            
+                tag_filter = {
+                    "tags": {"$in": list(found_tags)},
+                    "_id": {"$nin": [ObjectId(c["id"]) if len(c["id"]) == 24 else c["id"] for c in all_candidates]}
+                }
+                cursor = opps_collection.find(tag_filter).limit(15 - len(all_candidates))
                 async for doc in cursor:
-                    candidates.append(serialize_mongo_document(doc))
-            
-            if candidates:
-                new_ones = [c for c in candidates if c["id"] not in interested_ids]
-                if new_ones:
-                    path_opps.append(new_ones[0])
-                else:
-                    path_opps.append(candidates[0])
+                    all_candidates.append(serialize_mongo_document(doc))
+        
+        # 3. Goal-type expansion: If still < 12, fill with general goal matches
+            goal_filter = {
+                "goal_tags": goal,
+                "_id": {"$nin": [ObjectId(c["id"]) if len(c["id"]) == 24 else c["id"] for c in all_candidates]}
+            }
+            cursor = opps_collection.find(goal_filter).limit(15 - len(all_candidates))
+            async for doc in cursor:
+                all_candidates.append(serialize_mongo_document(doc))
 
-        if not path_opps:
-            return PathfindResponse(steps=get_static_fallback_path(goal))
+        # 3. Fallback to goal_tags if still empty
+        if not all_candidates:
+            cursor = opps_collection.find({"goal_tags": goal}).limit(12)
+            async for doc in cursor:
+                all_candidates.append(serialize_mongo_document(doc))
+        
+        # Absolute fallback if still empty
+        if not all_candidates:
+            return PathfindResponse(steps=get_static_fallback_path(goal), alternatives=[])
 
-        steps = []
-        for i, opp in enumerate(path_opps):
+        # Separate candidates into main path (first 3) and alternatives (the rest)
+        path_opps = all_candidates[:3]
+        alt_opps = all_candidates[3:15] # Return up to 12 alternatives (15 total nodes)
+
+        async def build_step(opp, order, is_alt=False):
             b_id = opp.get("building_id")
             try:
-                b_doc = await bldgs_collection.find_one({"_id": ObjectId(b_id) if len(b_id) == 24 else b_id})
+                b_query = {"_id": ObjectId(b_id)} if len(str(b_id)) == 24 else {"_id": b_id}
+                b_doc = await bldgs_collection.find_one(b_query)
             except:
                 b_doc = None
-                
-            b_name = b_doc.get("name", "Unknown Building") if b_doc else "Unknown Building"
             
-            # Call AI for short_reason
-            try:
-                reason = await generate_step_reason(
-                    user_profile=current_user,
-                    goal_type=goal,
-                    goal_text=goal_text,
-                    opportunity_title=opp["title"],
-                    building_name=b_name
-                )
-            except:
-                reason = f"This {opp['type']} helps build relevant skills for your {goal} goals."
+            b_name = b_doc.get("name", "UF Campus") if b_doc else "UF Campus"
             
-            # Map node IDs using slugify for consistent graph messaging
-            skill_ids = [f"skill:{slugify(s)}" for s in opp.get("tags", [])[:2]]
-            network_ids = [f"bldg:{b_id}", f"opp:{str(opp['id'])}"]
+            if not is_alt:
+                try:
+                    reason = await generate_step_reason(
+                        user_profile=current_user,
+                        goal_type=goal,
+                        goal_text=goal_text,
+                        opportunity_title=opp["title"],
+                        building_name=b_name
+                    )
+                except:
+                    reason = f"Essential milestone for {goal_text} development."
+            else:
+                reason = f"Excellent supplementary opportunity in {b_name} to broaden your {goal_text} exposure."
 
-            steps.append(PathStep(
-                order=i + 1,
+            skill_ids = [f"skill:{slugify(s)}" for s in opp.get("tags", [])[:2]]
+            # Use 'alt:' prefix for IDs if it's an alternative to help graph distinguish
+            prefix = "alt" if is_alt else "opp"
+            network_ids = [f"bldg:{b_id}", f"{prefix}:{str(opp['id'])}"]
+
+            return PathStep(
+                order=order,
                 goal_type=goal,
-                building_id=b_id,
+                building_id=str(b_id),
                 building_name=b_name,
                 opportunity_id=str(opp["id"]),
                 opportunity_title=opp["title"],
@@ -437,10 +458,18 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
                 network_node_ids=network_ids,
                 cta_label="View Details",
                 cta_url=f"/building/{b_id}?opp={str(opp['id'])}"
-            ))
+            )
+
+        steps = []
+        for i, opp in enumerate(path_opps):
+            steps.append(await build_step(opp, i + 1))
             
-        logger.info(f"Generated Personalized Golden Path for user {user_id} with {len(steps)} steps")
-        return PathfindResponse(steps=steps)
+        alternatives = []
+        for i, opp in enumerate(alt_opps):
+            alternatives.append(await build_step(opp, len(steps) + i + 1, is_alt=True))
+            
+        logger.info(f"Generated Path ({len(steps)}) + Alternatives ({len(alternatives)}) for user {user_id}")
+        return PathfindResponse(steps=steps, alternatives=alternatives)
 
     except Exception as e:
         logger.error(f"Pathfind error, returning fallback: {e}")
