@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -17,7 +17,7 @@ export default function MagicButton({ size = 64 }: MagicButtonProps) {
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.9,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -26,7 +26,7 @@ export default function MagicButton({ size = 64 }: MagicButtonProps) {
       toValue: 1,
       friction: 3,
       tension: 40,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 

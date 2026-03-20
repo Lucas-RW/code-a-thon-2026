@@ -122,6 +122,7 @@ class PathStep(BaseModel):
 
 class PathfindResponse(BaseModel):
     steps: List[PathStep]
+    alternatives: List[PathStep] = Field(default_factory=list)
 
 
 # ── AI Bootstrap schemas ─────────────────────────────────────────────────────
