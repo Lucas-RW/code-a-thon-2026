@@ -325,6 +325,18 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             {isExpanded ? (
               <View style={styles.expandedBlock}>
                 <Text style={styles.sectionBody}>{item.description || 'Additional details coming soon.'}</Text>
+                {item.hosted_by ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Hosted by</Text>
+                    <Text style={styles.detailValue}>{item.hosted_by}</Text>
+                  </View>
+                ) : null}
+                {item.location_detail ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Location</Text>
+                    <Text style={styles.detailValue}>{item.location_detail}</Text>
+                  </View>
+                ) : null}
                 {item.department ? (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Department</Text>
@@ -332,7 +344,7 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
                   </View>
                 ) : null}
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Hourly commitment</Text>
+                  <Text style={styles.detailLabel}>{item.type === 'event' ? 'Time' : 'Hourly commitment'}</Text>
                   <Text style={styles.detailValue}>{item.hourly_commitment || 'TBD'}</Text>
                 </View>
                 {item.terms_available ? (
@@ -367,7 +379,7 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
                 ) : null}
                 {item.deadline ? (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Application deadline</Text>
+                    <Text style={styles.detailLabel}>{item.type === 'event' ? 'Date' : 'Application deadline'}</Text>
                     <Text style={styles.detailValue}>{item.deadline}</Text>
                   </View>
                 ) : null}
@@ -407,6 +419,12 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Application requirements</Text>
                     <Text style={styles.detailValue}>{item.application_requirements}</Text>
+                  </View>
+                ) : null}
+                {item.next_steps ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Next steps</Text>
+                    <Text style={styles.detailValue}>{item.next_steps}</Text>
                   </View>
                 ) : null}
                 {item.url ? (

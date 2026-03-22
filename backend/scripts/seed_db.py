@@ -2,7 +2,12 @@ import asyncio
 from bson import ObjectId
 from app.db import database
 from scripts.malachowsky_cise_directory import MALACHOWSKY_CISE_DIRECTORY
+from scripts.malachowsky_events import MALACHOWSKY_EVENTS
+from scripts.malachowsky_opportunities import MALACHOWSKY_OPPORTUNITIES
 from scripts.malachowsky_research_opportunities import MALACHOWSKY_RESEARCH_OPPORTUNITIES
+from scripts.new_physics_directory import NEW_PHYSICS_DIRECTORY
+from scripts.new_physics_events import NEW_PHYSICS_EVENTS
+from scripts.new_physics_research_opportunities import NEW_PHYSICS_RESEARCH_OPPORTUNITIES
 
 async def main():
     buildings_collection = database.get_collection("buildings")
@@ -71,29 +76,18 @@ async def main():
             "short_name": "NPB",
             "lat": 29.6438,
             "lng": -82.3503,
-            "departments": ["Physics", "Astronomy", "Research Labs"],
-            "description": "A science-focused building seeded with placeholder content for research pathways, faculty connections, and lab-oriented opportunities.",
-            "image_url": "https://placehold.co/1200x700/0F172A/F8FAFC?text=New+Physics+Building",
-            "professors": [
-                {
-                    "id": "npb-p1",
-                    "name": "Dr. Elena Sato",
-                    "department": "Astrophysics",
-                    "focus": "Observational astronomy and data-intensive space research.",
-                    "email": "elena.sato@ufl.edu",
-                    "linkedin_url": "https://www.linkedin.com/in/elena-sato-uf",
-                    "image_url": "https://placehold.co/400x400/1A1A2E/F8FAFC?text=ES"
-                },
-                {
-                    "id": "npb-p2",
-                    "name": "Prof. Marcus Liu",
-                    "department": "Applied Physics",
-                    "focus": "Instrumentation, experimental systems, and lab mentorship.",
-                    "email": "marcus.liu@ufl.edu",
-                    "linkedin_url": "https://www.linkedin.com/in/marcus-liu-uf",
-                    "image_url": "https://placehold.co/400x400/14182A/F8FAFC?text=ML"
-                }
-            ]
+            "departments": [
+                "Physics",
+                "Astrophysics",
+                "High Energy Physics",
+                "Fundamental Theory",
+                "Biological Physics",
+                "Condensed Matter Physics",
+                "Research Seminars",
+            ],
+            "description": "The New Physics Building at the University of Florida serves as a core hub for physics research, seminars, and interdisciplinary scientific collaboration. It hosts activity across high energy physics, astrophysics, theoretical physics, and biological physics, while also supporting colloquia, faculty-led research groups, and student-facing academic events.",
+            "image_url": "https://www.phys.ufl.edu/wp/wp-content/uploads/2018/06/physics-building.jpg",
+            "professors": NEW_PHYSICS_DIRECTORY
         }
     ]
     
@@ -112,6 +106,20 @@ async def main():
                 **opportunity,
             }
             for opportunity in MALACHOWSKY_RESEARCH_OPPORTUNITIES
+        ],
+        *[
+            {
+                "building_id": str(building_ids["Malachowsky Hall"]),
+                **event,
+            }
+            for event in MALACHOWSKY_EVENTS
+        ],
+        *[
+            {
+                "building_id": str(building_ids["Malachowsky Hall"]),
+                **opportunity,
+            }
+            for opportunity in MALACHOWSKY_OPPORTUNITIES
         ],
         {
             "building_id": str(building_ids["Reitz Union"]),
@@ -155,44 +163,28 @@ async def main():
         },
         {
             "building_id": str(building_ids["New Physics Building"]),
-            "type": "course",
-            "title": "Advanced Quantum Mechanics",
-            "description": "In-depth study of quantum field theory and advanced modeling techniques.",
-            "summary": "Advanced course for physics pathway students.",
-            "professor": "Dr. Elena Sato",
-            "professor_id": "npb-p1",
-            "tags": ["Quantum", "Physics"],
-            "deadline": "2026-08-20",
-            "hourly_commitment": "4 hrs class + study",
-            "pay": "N/A",
-            "goal_tags": ["academic_aid", "research"]
+            **NEW_PHYSICS_RESEARCH_OPPORTUNITIES[0]
         },
         {
             "building_id": str(building_ids["New Physics Building"]),
-            "type": "research",
-            "title": "Applied AI Pathway",
-            "description": "A curated sequence of people, skills, and opportunities that helps students move toward applied research.",
-            "summary": "Structured path for student researchers.",
-            "professor": "Dr. Elena Sato",
-            "professor_id": "npb-p1",
-            "tags": ["Research", "Data"],
-            "hourly_commitment": "6-8 hrs/week",
-            "pay": "$15/hr if funded",
-            "goal_tags": ["research", "career"]
+            **NEW_PHYSICS_RESEARCH_OPPORTUNITIES[1]
         },
         {
             "building_id": str(building_ids["New Physics Building"]),
-            "type": "event",
-            "title": "Physics Lab Open House",
-            "description": "Explore experimental setups, meet faculty, and learn about lab opportunities.",
-            "summary": "Open-house event for new researchers.",
-            "professor": "Prof. Marcus Liu",
-            "professor_id": "npb-p2",
-            "tags": ["Labs", "Physics"],
-            "hourly_commitment": "One evening",
-            "pay": "N/A",
-            "goal_tags": ["research", "academic_aid"]
-        }
+            **NEW_PHYSICS_RESEARCH_OPPORTUNITIES[2]
+        },
+        {
+            "building_id": str(building_ids["New Physics Building"]),
+            **NEW_PHYSICS_EVENTS[0]
+        },
+        {
+            "building_id": str(building_ids["New Physics Building"]),
+            **NEW_PHYSICS_EVENTS[1]
+        },
+        {
+            "building_id": str(building_ids["New Physics Building"]),
+            **NEW_PHYSICS_EVENTS[2]
+        },
     ]
 
     for o in opportunities_data:

@@ -323,7 +323,6 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>From Your Network</Text>
-          <Text style={styles.sectionHint}>Graph-based updates</Text>
         </View>
         {feedItems.map((item) => (
           <TouchableOpacity

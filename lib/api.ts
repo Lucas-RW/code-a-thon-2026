@@ -177,6 +177,9 @@ export interface Opportunity {
   description?: string;
   summary?: string;
   department?: string;
+  hosted_by?: string;
+  location_detail?: string;
+  next_steps?: string;
   professor?: string;
   professor_id?: string;
   phd_student_mentors?: string;
