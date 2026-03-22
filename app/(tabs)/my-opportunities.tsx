@@ -3,19 +3,29 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } fr
 import { getItem, setItem } from '@/lib/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { fetchInterestedOpportunities, InterestedOpportunity, GoalType, GOAL_OPTIONS } from '@/lib/api';
+import { fetchInterestedOpportunities, InterestedOpportunity } from '@/lib/api';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
 import { shadows, theme } from '@/lib/theme';
 
-const GOAL_PERSIST_KEY = 'campuslens_selected_goal';
+const FILTER_PERSIST_KEY = 'campuslens_selected_opportunity_filter';
 
-const GOAL_MICROCOPY: Record<GoalType, string> = {
-  career: 'Focus on opportunities that build career capital.',
-  research: 'Highlight opportunities that move you toward research.',
-  academic_aid: 'Surface options to strengthen your coursework.',
-  social_support: 'Lift up spaces for community and support.',
+type OpportunityFilter = 'all' | 'interested' | 'work' | 'research' | 'social';
+
+const FILTER_OPTIONS: { id: OpportunityFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'interested', label: 'Interested' },
+  { id: 'work', label: 'Work' },
+  { id: 'research', label: 'Research' },
+  { id: 'social', label: 'Social' },
+];
+
+const FILTER_MICROCOPY: Record<Exclude<OpportunityFilter, 'all'>, string> = {
+  interested: 'Everything you have marked to revisit.',
+  work: 'Roles, courses, and career-building opportunities.',
+  research: 'Research-focused labs, projects, and faculty pathways.',
+  social: 'Community, student life, and support-oriented opportunities.',
 };
 
 export default function MyOpportunitiesScreen() {
@@ -23,22 +33,21 @@ export default function MyOpportunitiesScreen() {
   const router = useRouter();
   const { showToast } = useToast();
 
-  const initialGoal = userProfile?.goals && userProfile.goals.length > 0 ? userProfile.goals[0] : 'all';
   const [opportunities, setOpportunities] = React.useState<InterestedOpportunity[]>([]);
-  const [selectedGoal, setSelectedGoal] = React.useState<GoalType | 'all'>(initialGoal);
+  const [selectedFilter, setSelectedFilter] = React.useState<OpportunityFilter>('all');
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isFallbackMode, setIsFallbackMode] = React.useState(false);
 
   React.useEffect(() => {
-    getItem(GOAL_PERSIST_KEY).then((val) => {
-      if (val) setSelectedGoal(val as GoalType | 'all');
+    getItem(FILTER_PERSIST_KEY).then((val) => {
+      if (val) setSelectedFilter(val as OpportunityFilter);
     });
   }, []);
 
-  const handleGoalChange = (goal: GoalType | 'all') => {
-    setSelectedGoal(goal);
-    setItem(GOAL_PERSIST_KEY, goal);
+  const handleFilterChange = (filter: OpportunityFilter) => {
+    setSelectedFilter(filter);
+    setItem(FILTER_PERSIST_KEY, filter);
   };
 
   const loadOpportunities = React.useCallback(async () => {
@@ -58,14 +67,35 @@ export default function MyOpportunitiesScreen() {
   }, [accessToken, showToast]);
 
   const filteredOpportunities = React.useMemo(() => {
-    if (selectedGoal === 'all') {
+    if (selectedFilter === 'all' || selectedFilter === 'interested') {
       setIsFallbackMode(false);
       return opportunities;
     }
 
-    const filtered = opportunities.filter(
-      (opp) => opp.goal_tags && opp.goal_tags.includes(selectedGoal)
-    );
+    const filtered = opportunities.filter((opp) => {
+      if (selectedFilter === 'work') {
+        return (
+          opp.type === 'job' ||
+          opp.type === 'course' ||
+          opp.goal_tags?.includes('career') ||
+          opp.goal_tags?.includes('academic_aid')
+        );
+      }
+
+      if (selectedFilter === 'research') {
+        return opp.type === 'research' || opp.goal_tags?.includes('research');
+      }
+
+      if (selectedFilter === 'social') {
+        return (
+          opp.type === 'student_org' ||
+          opp.type === 'event' ||
+          opp.goal_tags?.includes('social_support')
+        );
+      }
+
+      return true;
+    });
 
     if (filtered.length === 0 && opportunities.length > 0) {
       setIsFallbackMode(true);
@@ -74,7 +104,7 @@ export default function MyOpportunitiesScreen() {
 
     setIsFallbackMode(false);
     return filtered;
-  }, [opportunities, selectedGoal]);
+  }, [opportunities, selectedFilter]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -163,23 +193,17 @@ export default function MyOpportunitiesScreen() {
 
         <View style={styles.goalSelectorContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.goalSelector}>
-            <TouchableOpacity
-              style={[styles.goalChip, selectedGoal === 'all' && styles.activeGoalChip]}
-              onPress={() => handleGoalChange('all')}
-            >
-              <Text style={[styles.goalChipText, selectedGoal === 'all' && styles.activeGoalChipText]}>All Goals</Text>
-            </TouchableOpacity>
-            {GOAL_OPTIONS.map((goal) => (
+            {FILTER_OPTIONS.map((filter) => (
               <TouchableOpacity
-                key={goal.id}
-                style={[styles.goalChip, selectedGoal === goal.id && styles.activeGoalChip]}
-                onPress={() => handleGoalChange(goal.id)}
+                key={filter.id}
+                style={[styles.goalChip, selectedFilter === filter.id && styles.activeGoalChip]}
+                onPress={() => handleFilterChange(filter.id)}
               >
-                <Text style={[styles.goalChipText, selectedGoal === goal.id && styles.activeGoalChipText]}>{goal.label}</Text>
+                <Text style={[styles.goalChipText, selectedFilter === filter.id && styles.activeGoalChipText]}>{filter.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          {selectedGoal !== 'all' ? <Text style={styles.goalMicrocopy}>{GOAL_MICROCOPY[selectedGoal]}</Text> : null}
+          {selectedFilter !== 'all' ? <Text style={styles.goalMicrocopy}>{FILTER_MICROCOPY[selectedFilter]}</Text> : null}
         </View>
 
         {isFallbackMode ? (

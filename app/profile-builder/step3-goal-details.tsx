@@ -47,6 +47,7 @@ export default function Step3GoalDetails() {
           style={styles.input}
           placeholder="e.g. Software Engineer, Designer (comma separated)"
           placeholderTextColor="#666"
+          value={profileData.goal_preferences.career?.target_roles?.join(', ') ?? ''}
           onChangeText={(text) => updateGoalPreferences('career', { ...profileData.goal_preferences.career, target_roles: text.split(',').map(s => s.trim()) })}
         />
       </View>
@@ -76,6 +77,7 @@ export default function Step3GoalDetails() {
           style={styles.input}
           placeholder="e.g. AI, Quantum Physics (comma separated)"
           placeholderTextColor="#666"
+          value={profileData.goal_preferences.research?.fields?.join(', ') ?? ''}
           onChangeText={(text) => updateGoalPreferences('research', { ...profileData.goal_preferences.research, fields: text.split(',').map(s => s.trim()) })}
         />
       </View>
@@ -105,6 +107,7 @@ export default function Step3GoalDetails() {
           style={styles.input}
           placeholder="e.g. CS50, MATH101 (comma separated)"
           placeholderTextColor="#666"
+          value={profileData.goal_preferences.academic_aid?.courses_of_concern?.join(', ') ?? ''}
           onChangeText={(text) => updateGoalPreferences('academic_aid', { ...profileData.goal_preferences.academic_aid, courses_of_concern: text.split(',').map(s => s.trim()) })}
         />
       </View>
@@ -134,6 +137,7 @@ export default function Step3GoalDetails() {
           style={styles.input}
           placeholder="e.g. Community, Mentorship (comma separated)"
           placeholderTextColor="#666"
+          value={profileData.goal_preferences.social_support?.seeks?.join(', ') ?? ''}
           onChangeText={(text) => updateGoalPreferences('social_support', { ...profileData.goal_preferences.social_support, seeks: text.split(',').map(s => s.trim()) })}
         />
       </View>

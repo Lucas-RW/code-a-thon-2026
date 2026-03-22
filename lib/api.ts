@@ -143,8 +143,12 @@ export interface BuildingSummary {
   professors?: {
     id: string;
     name: string;
-    department: string;
+    department?: string;
+    title?: string;
+    affiliations?: string;
     focus?: string;
+    phone?: string;
+    location?: string;
     email?: string;
     linkedin_url?: string;
     image_url?: string;
@@ -172,8 +176,16 @@ export interface Opportunity {
   title: string;
   description?: string;
   summary?: string;
+  department?: string;
   professor?: string;
   professor_id?: string;
+  phd_student_mentors?: string;
+  terms_available?: string;
+  student_level?: string;
+  prerequisites?: string;
+  credit?: string;
+  stipend?: string;
+  application_requirements?: string;
   tags: string[];
   contact?: string;
   url?: string;

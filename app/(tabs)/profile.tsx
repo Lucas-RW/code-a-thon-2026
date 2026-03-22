@@ -21,13 +21,6 @@ import { shadows, theme } from '@/lib/theme';
 
 type OpportunityStatus = 'saved' | 'viewed' | 'applied';
 
-type ActivityItem = {
-  id: string;
-  label: string;
-  meta: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-};
-
 const STATUS_STORAGE_KEY = 'campuslens_profile_opportunity_statuses';
 const STATUS_ORDER: OpportunityStatus[] = ['saved', 'viewed', 'applied'];
 
@@ -44,10 +37,6 @@ const GOAL_INTEREST_MAP: Record<GoalType, string[]> = {
   academic_aid: ['Academic Support', 'Study Groups'],
   social_support: ['Student Life', 'Mentorship'],
 };
-
-function formatGoalLabel(goal: GoalType) {
-  return goal.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-}
 
 function formatStatusLabel(status: OpportunityStatus) {
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -152,55 +141,40 @@ export default function ProfileScreen() {
         icon: 'auto-awesome' as const,
       },
       {
-        id: 'explored',
-        label: 'Opportunities Explored',
-        value: String(opportunities.length),
-        icon: 'trending-up' as const,
-      },
-      {
         id: 'interests',
         label: 'Active Interests',
         value: String(derivedInterests.length),
         icon: 'favorite-border' as const,
       },
     ],
-    [derivedInterests.length, derivedSkills.length, opportunities.length]
+    [derivedInterests.length, derivedSkills.length]
   );
 
   const graphSize = derivedSkills.length + derivedInterests.length + opportunities.length;
 
-  const activityHistory = React.useMemo<ActivityItem[]>(() => {
-    if (!userProfile) return [];
-
-    const timeline: ActivityItem[] = [];
-
-    timeline.push({
-      id: 'major',
-      label: `Set your academic path around ${userProfile.major}`,
-      meta: userProfile.year ? `Class of ${userProfile.year}` : 'Profile milestone',
-      icon: 'school',
-    });
-
-    userProfile.goals.slice(0, 2).forEach((goal) => {
-      timeline.push({
-        id: `goal-${goal}`,
-        label: `Focused your journey on ${formatGoalLabel(goal)}`,
-        meta: 'Goal preference updated',
-        icon: 'track-changes',
-      });
-    });
-
-    opportunities.slice(0, 3).forEach((item) => {
-      timeline.push({
-        id: item.id,
-        label: `Marked ${item.title} as interested`,
-        meta: item.building_name,
-        icon: 'bookmark-border',
-      });
-    });
-
-    return timeline.slice(0, 5);
-  }, [opportunities, userProfile]);
+  const recentActivity = React.useMemo(
+    () => [
+      {
+        id: 'interests',
+        label: 'Saved',
+        value: String(opportunities.length),
+        icon: 'bookmark' as const,
+      },
+      {
+        id: 'goals',
+        label: 'Goals',
+        value: String(userProfile?.goals.length ?? 0),
+        icon: 'track-changes' as const,
+      },
+      {
+        id: 'next',
+        label: 'Next Step',
+        value: opportunities[0] ? 'Ready' : 'Explore',
+        icon: 'auto-awesome' as const,
+      },
+    ],
+    [opportunities, userProfile?.goals.length]
+  );
 
   if ((isLoading || isDashboardLoading) && !userProfile) {
     return <LoadingState message="Loading your growth dashboard..." />;
@@ -236,7 +210,7 @@ export default function ProfileScreen() {
               <Text style={styles.name}>{userProfile.name}</Text>
               <Text style={styles.metaText}>{userProfile.major || 'Major coming soon'}</Text>
               <Text style={styles.metaText}>
-                {userProfile.year ? `Class of ${userProfile.year}` : 'Graduation year coming soon'}
+                {userProfile.year ? `${userProfile.year}` : 'Graduation year coming soon'}
               </Text>
             </View>
           </View>
@@ -295,63 +269,6 @@ export default function ProfileScreen() {
           <View style={styles.graphPlaceholder}>
             <SkillTree acquiredSkills={derivedSkills} acquiredOnly={true} />
           </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Saved & Interested Opportunities</Text>
-        </View>
-        <View style={styles.sectionCard}>
-          {opportunities.length > 0 ? (
-            opportunities.slice(0, 4).map((item) => {
-              const status = statusMap[item.id] ?? 'saved';
-
-              return (
-                <View key={item.id} style={styles.opportunityCard}>
-                  <View style={styles.opportunityHeader}>
-                    <View style={styles.opportunityBody}>
-                      <Text style={styles.opportunityTitle}>{item.title}</Text>
-                      <Text style={styles.opportunityMeta}>{item.building_name}</Text>
-                    </View>
-                    <Pressable
-                      style={styles.statusButton}
-                      onPress={() => cycleOpportunityStatus(item.id, item.title)}
-                    >
-                      <Text style={styles.statusButtonText}>{formatStatusLabel(status)}</Text>
-                    </Pressable>
-                  </View>
-                  {item.description ? (
-                    <Text style={styles.opportunityDescription} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })
-          ) : (
-            <Text style={styles.emptyText}>When you mark opportunities as interested, they will appear here.</Text>
-          )}
-          <Pressable style={styles.secondaryAction} onPress={() => router.push('/my-opportunities')}>
-            <Text style={styles.secondaryActionText}>Open all saved opportunities</Text>
-            <MaterialIcons name="chevron-right" size={18} color={theme.colors.accentTertiary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Activity History</Text>
-          <Text style={styles.sectionHint}>Recent movement</Text>
-        </View>
-        <View style={styles.sectionCard}>
-          {activityHistory.map((item, index) => (
-            <View key={item.id} style={[styles.timelineRow, index === activityHistory.length - 1 && styles.timelineRowLast]}>
-              <View style={styles.timelineIcon}>
-                <MaterialIcons name={item.icon} size={16} color={theme.colors.accentTertiary} />
-              </View>
-              <View style={styles.timelineBody}>
-                <Text style={styles.timelineLabel}>{item.label}</Text>
-                <Text style={styles.timelineMeta}>{item.meta}</Text>
-              </View>
-            </View>
-          ))}
         </View>
 
         <View style={styles.sectionHeader}>
@@ -613,6 +530,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
+  activityRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 28,
+  },
+  activityCard: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
+    ...shadows.card,
+  },
+  activityValue: {
+    color: theme.colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+  activityLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   opportunityCard: {
     paddingBottom: 16,
     marginBottom: 16,
@@ -669,44 +613,6 @@ const styles = StyleSheet.create({
     color: theme.colors.accentTertiary,
     fontSize: 14,
     fontWeight: '700',
-  },
-  timelineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingBottom: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  timelineRowLast: {
-    marginBottom: 0,
-    paddingBottom: 0,
-    borderBottomWidth: 0,
-  },
-  timelineIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.accentWash,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  timelineBody: {
-    flex: 1,
-  },
-  timelineLabel: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  timelineMeta: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   preferenceRow: {
     flexDirection: 'row',

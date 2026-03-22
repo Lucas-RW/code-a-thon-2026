@@ -1,14 +1,15 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity } from '@/lib/api';
+import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity, GoalType } from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
-import VoyagerOverlay from '@/components/VoyagerOverlay';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { shadows, theme } from '@/lib/theme';
+import BuildingARDetailSheet from '@/src/arOverlay/BuildingARDetailSheet';
+import type { ARBuilding } from '@/src/arOverlay/types';
 
 type FeedItem = {
   id: string;
@@ -19,12 +20,53 @@ type FeedItem = {
   buildingShortName?: string;
 };
 
+type ActivityItem = {
+  id: string;
+  label: string;
+  meta: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+};
+
 function getInitials(label: string) {
   return label
     .split(' ')
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join('');
+}
+
+function formatGoalLabel(goal: GoalType) {
+  return goal.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toARBuilding(building: BuildingSummary, opportunityCount: number): ARBuilding {
+  const departments = building.departments ?? [];
+  const lowered = departments.map((department) => department.toLowerCase());
+
+  const buildingType = lowered.some((department) =>
+    ['student', 'community', 'campus', 'organization'].some((keyword) => department.includes(keyword))
+  )
+    ? 'student_life'
+    : lowered.some((department) =>
+        ['physics', 'science', 'astronomy', 'biology', 'chemistry', 'research'].some((keyword) => department.includes(keyword))
+      )
+      ? 'science'
+      : 'engineering';
+
+  return {
+    id: building.id,
+    name: building.name,
+    lat: building.lat,
+    lng: building.lng,
+    screenX: 0.5,
+    screenY: 0.5,
+    distanceMeters: 0,
+    opportunityCount,
+    buildingType,
+    inView: true,
+    description: building.description,
+    image_url: building.image_url,
+  };
 }
 
 export default function HomeScreen() {
@@ -34,7 +76,7 @@ export default function HomeScreen() {
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [interests, setInterests] = React.useState<InterestedOpportunity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [voyagerBuilding, setVoyagerBuilding] = React.useState<BuildingSummary | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = React.useState<ARBuilding | null>(null);
 
   const loadHome = React.useCallback(async () => {
     setIsLoading(true);
@@ -74,30 +116,57 @@ export default function HomeScreen() {
   }, [buildingLookup, buildings, interests]);
 
   const featuredOpportunity = interests[0] ?? null;
+  const opportunityCountByBuilding = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    interests.forEach((item) => {
+      counts.set(item.building_id, (counts.get(item.building_id) ?? 0) + 1);
+    });
+    return counts;
+  }, [interests]);
 
-  const recentActivity = React.useMemo(
-    () => [
-      {
-        id: 'interests',
-        label: 'Saved',
-        value: String(interests.length),
-        icon: 'bookmark',
-      },
-      {
-        id: 'goals',
-        label: 'Goals',
-        value: String(userProfile?.goals.length ?? 0),
+  const recentActivity = React.useMemo<ActivityItem[]>(() => {
+    const timeline: ActivityItem[] = [];
+
+    if (userProfile?.major) {
+      timeline.push({
+        id: 'major',
+        label: `Set your academic path around ${userProfile.major}`,
+        meta: userProfile.year ? `${userProfile.year}` : 'Profile milestone',
+        icon: 'school',
+      });
+    }
+
+    (userProfile?.goals ?? []).slice(0, 2).forEach((goal) => {
+      timeline.push({
+        id: `goal-${goal}`,
+        label: `Focused your journey on ${formatGoalLabel(goal)}`,
+        meta: 'Goal preference updated',
         icon: 'track-changes',
-      },
+      });
+    });
+
+    interests.slice(0, 3).forEach((item) => {
+      timeline.push({
+        id: item.id,
+        label: `Marked ${item.title} as interested`,
+        meta: item.building_name,
+        icon: 'bookmark-border',
+      });
+    });
+
+    if (timeline.length > 0) {
+      return timeline.slice(0, 5);
+    }
+
+    return [
       {
-        id: 'next',
-        label: 'Next Step',
-        value: featuredOpportunity ? 'Ready' : 'Explore',
+        id: 'empty-activity',
+        label: 'Explore buildings to start shaping your path',
+        meta: 'Recent movement will appear here',
         icon: 'auto-awesome',
       },
-    ],
-    [featuredOpportunity, interests.length, userProfile?.goals.length]
-  );
+    ];
+  }, [interests, userProfile]);
 
   const feedItems = React.useMemo<FeedItem[]>(() => {
     const items = interests.slice(0, 5).map((item) => ({
@@ -169,10 +238,20 @@ export default function HomeScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.buildingRail}>
           {personalizedBuildings.map((building) => (
-            <TouchableOpacity key={building.id} style={styles.buildingPill} onPress={() => openBuilding(building)}>
-              <LinearGradient colors={[...theme.gradients.panelGlow]} style={styles.buildingAvatar}>
-                <Text style={styles.buildingAvatarText}>{getInitials(building.short_name || building.name)}</Text>
-              </LinearGradient>
+            <TouchableOpacity
+              key={building.id}
+              style={styles.buildingPill}
+              onPress={() => setSelectedBuilding(toARBuilding(building, opportunityCountByBuilding.get(building.id) ?? 0))}
+            >
+              {building.image_url ? (
+                <View style={styles.buildingAvatarFrame}>
+                  <Image source={{ uri: building.image_url }} style={styles.buildingAvatarImage} />
+                </View>
+              ) : (
+                <LinearGradient colors={[...theme.gradients.panelGlow]} style={styles.buildingAvatar}>
+                  <Text style={styles.buildingAvatarText}>{getInitials(building.short_name || building.name)}</Text>
+                </LinearGradient>
+              )}
               <Text style={styles.buildingLabel} numberOfLines={1}>
                 {building.short_name || building.name}
               </Text>
@@ -181,15 +260,19 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionTitle}>Activity History</Text>
           <Text style={styles.sectionHint}>Your momentum</Text>
         </View>
-        <View style={styles.activityRow}>
-          {recentActivity.map((item) => (
-            <View key={item.id} style={styles.activityCard}>
-              <MaterialIcons name={item.icon as any} size={18} color={theme.colors.accentTertiary} />
-              <Text style={styles.activityValue}>{item.value}</Text>
-              <Text style={styles.activityLabel}>{item.label}</Text>
+        <View style={styles.activityHistoryCard}>
+          {recentActivity.map((item, index) => (
+            <View key={item.id} style={[styles.timelineRow, index === recentActivity.length - 1 && styles.timelineRowLast]}>
+              <View style={styles.timelineIcon}>
+                <MaterialIcons name={item.icon} size={16} color={theme.colors.accentTertiary} />
+              </View>
+              <View style={styles.timelineBody}>
+                <Text style={styles.timelineLabel}>{item.label}</Text>
+                <Text style={styles.timelineMeta}>{item.meta}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -265,7 +348,7 @@ export default function HomeScreen() {
             <TouchableOpacity 
               onPress={() => {
                 const b = buildings.find(b => b.id === item.buildingId);
-                if (b) setVoyagerBuilding(b);
+                if (b) setSelectedBuilding(toARBuilding(b, opportunityCountByBuilding.get(b.id) ?? 0));
               }}
               style={styles.voyagerTrigger}
             >
@@ -275,10 +358,10 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {voyagerBuilding && (
-        <VoyagerOverlay 
-          building={voyagerBuilding}
-          onClose={() => setVoyagerBuilding(null)}
+      {selectedBuilding && (
+        <BuildingARDetailSheet
+          building={selectedBuilding}
+          onClose={() => setSelectedBuilding(null)}
         />
       )}
     </SafeAreaView>
@@ -359,6 +442,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.whiteSoft,
     marginBottom: 10,
   },
+  buildingAvatarFrame: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginBottom: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.whiteSoft,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  buildingAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
   buildingAvatarText: {
     color: theme.colors.textPrimary,
     fontSize: 18,
@@ -370,30 +467,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  activityRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-  },
-  activityCard: {
-    flex: 1,
+  activityHistoryCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 16,
+    padding: 18,
+    marginBottom: 28,
     ...shadows.card,
   },
-  activityValue: {
-    color: theme.colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 12,
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  activityLabel: {
+  timelineRowLast: {
+    marginBottom: 0,
+    paddingBottom: 0,
+    borderBottomWidth: 0,
+  },
+  timelineIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  timelineBody: {
+    flex: 1,
+  },
+  timelineLabel: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  timelineMeta: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },

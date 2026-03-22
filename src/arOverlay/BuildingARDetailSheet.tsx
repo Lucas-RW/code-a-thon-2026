@@ -39,8 +39,12 @@ type TabKey = 'description' | 'professors' | 'opportunities' | 'events' | 'resea
 type BuildingProfessor = {
   id: string;
   name: string;
-  department: string;
-  focus: string;
+  department?: string;
+  title?: string;
+  affiliations?: string;
+  focus?: string;
+  phone?: string;
+  location?: string;
   email?: string;
   linkedin_url?: string;
   image_url?: string;
@@ -167,6 +171,12 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     } catch {}
   };
 
+  const hasValue = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = value.trim();
+    return normalized.length > 0 && normalized.toUpperCase() !== 'TBD';
+  };
+
   const renderDescription = () => (
     <View style={styles.panelStack}>
       <View style={styles.sectionCard}>
@@ -214,16 +224,16 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             </View>
             <View style={styles.professorTextWrap}>
               <Text style={styles.cardTitle}>{professor.name}</Text>
-              <Text style={styles.cardMeta}>{professor.department}</Text>
+              <Text style={styles.cardMeta}>{professor.title || professor.department || 'Campus contact'}</Text>
             </View>
             </View>
             <View style={styles.professorActionRow}>
-              {professor.linkedin_url ? (
+              {hasValue(professor.linkedin_url) ? (
                 <Pressable style={styles.iconAction} onPress={() => openExternal(professor.linkedin_url!)}>
                   <Ionicons name="logo-linkedin" size={18} color={theme.colors.accentTertiary} />
                 </Pressable>
               ) : null}
-              {professor.email ? (
+              {hasValue(professor.email) ? (
                 <Pressable style={styles.iconAction} onPress={() => openExternal(`mailto:${professor.email}`)}>
                   <Ionicons name="mail-outline" size={18} color={theme.colors.accentTertiary} />
                 </Pressable>
@@ -239,7 +249,36 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
           </View>
           {isExpanded ? (
             <View style={styles.expandedBlock}>
-              <Text style={styles.sectionBody}>{professor.focus}</Text>
+              {hasValue(professor.affiliations || professor.focus) ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Affiliations</Text>
+                  <Text style={styles.detailValue}>{professor.affiliations || professor.focus}</Text>
+                </View>
+              ) : null}
+              {professor.department ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Directory</Text>
+                  <Text style={styles.detailValue}>{professor.department}</Text>
+                </View>
+              ) : null}
+              {professor.location ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Location</Text>
+                  <Text style={styles.detailValue}>{professor.location}</Text>
+                </View>
+              ) : null}
+              {professor.phone ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Phone</Text>
+                  <Text style={styles.detailValue}>{professor.phone}</Text>
+                </View>
+              ) : null}
+              {hasValue(professor.email) ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue}>{professor.email}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -286,22 +325,96 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             {isExpanded ? (
               <View style={styles.expandedBlock}>
                 <Text style={styles.sectionBody}>{item.description || 'Additional details coming soon.'}</Text>
+                {item.department ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Department</Text>
+                    <Text style={styles.detailValue}>{item.department}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Hourly commitment</Text>
                   <Text style={styles.detailValue}>{item.hourly_commitment || 'TBD'}</Text>
                 </View>
+                {item.terms_available ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Terms available</Text>
+                    <Text style={styles.detailValue}>{item.terms_available}</Text>
+                  </View>
+                ) : null}
+                {item.student_level ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Student level</Text>
+                    <Text style={styles.detailValue}>{item.student_level}</Text>
+                  </View>
+                ) : null}
+                {item.credit ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Credit</Text>
+                    <Text style={styles.detailValue}>{item.credit}</Text>
+                  </View>
+                ) : null}
                 {item.pay ? (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Potential pay</Text>
                     <Text style={styles.detailValue}>{item.pay}</Text>
                   </View>
                 ) : null}
-                {item.professor ? (
+                {item.stipend ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Stipend</Text>
+                    <Text style={styles.detailValue}>{item.stipend}</Text>
+                  </View>
+                ) : null}
+                {item.deadline ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Application deadline</Text>
+                    <Text style={styles.detailValue}>{item.deadline}</Text>
+                  </View>
+                ) : null}
+                {item.professor ? item.professor_id ? (
                   <Pressable style={styles.detailRow} onPress={() => openProfessor(item.professor_id)}>
                     <Text style={styles.detailLabel}>Professor associated</Text>
                     <View style={styles.professorLink}>
                       <Text style={styles.professorLinkText}>{item.professor}</Text>
                       <Ionicons name="arrow-forward" size={14} color={theme.colors.accentTertiary} />
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Professor associated</Text>
+                    <Text style={styles.detailValue}>{item.professor}</Text>
+                  </View>
+                ) : null}
+                {item.contact ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Contact</Text>
+                    <Text style={styles.detailValue}>{item.contact}</Text>
+                  </View>
+                ) : null}
+                {item.phd_student_mentors ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Ph.D. mentor(s)</Text>
+                    <Text style={styles.detailValue}>{item.phd_student_mentors}</Text>
+                  </View>
+                ) : null}
+                {item.prerequisites ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Prerequisites</Text>
+                    <Text style={styles.detailValue}>{item.prerequisites}</Text>
+                  </View>
+                ) : null}
+                {item.application_requirements ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Application requirements</Text>
+                    <Text style={styles.detailValue}>{item.application_requirements}</Text>
+                  </View>
+                ) : null}
+                {item.url ? (
+                  <Pressable style={styles.detailRow} onPress={() => openExternal(item.url!)}>
+                    <Text style={styles.detailLabel}>Website</Text>
+                    <View style={styles.professorLink}>
+                      <Text style={styles.professorLinkText}>Open link</Text>
+                      <Ionicons name="open-outline" size={14} color={theme.colors.accentTertiary} />
                     </View>
                   </Pressable>
                 ) : null}
@@ -443,7 +556,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.42)',
   },
   scrollContent: {
-    paddingBottom: 36,
+    paddingBottom: 96,
   },
   hero: {
     height: 250,
@@ -533,6 +646,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     paddingHorizontal: 18,
     paddingTop: 18,
+    paddingBottom: 40,
   },
   panelStack: {
     gap: 14,

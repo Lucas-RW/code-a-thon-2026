@@ -1,6 +1,8 @@
 import asyncio
 from bson import ObjectId
 from app.db import database
+from scripts.malachowsky_cise_directory import MALACHOWSKY_CISE_DIRECTORY
+from scripts.malachowsky_research_opportunities import MALACHOWSKY_RESEARCH_OPPORTUNITIES
 
 async def main():
     buildings_collection = database.get_collection("buildings")
@@ -19,29 +21,21 @@ async def main():
             "short_name": "MAL",
             "lat": 28.348565,
             "lng": -81.237858,
-            "departments": ["Computer Science", "Electrical Engineering", "Data Science"],
-            "description": "A high-tech academic hub used here as the live AR test building, seeded with placeholder details for engineering, AI, and student project discovery.",
+            "departments": [
+                "Computer & Information Science & Engineering",
+                "Electrical & Computer Engineering",
+                "Engineering Education",
+                "Artificial Intelligence & Machine Learning",
+                "Data Science & Big Data Analytics",
+                "Cybersecurity & Privacy Engineering",
+                "Digital Health & Biomedical Informatics",
+                "Semiconductor & Microelectronics Research",
+                "Internet of Things & Connected Systems",
+                "High-Performance Computing & Research Computing"
+            ],
+            "description": "Malachowsky Hall for Data Science & Information Technology at the University of Florida is a multidisciplinary research and teaching facility that serves as the university’s central hub for artificial intelligence, data science, and advanced computing innovation. Opened in 2023 and named after NVIDIA co-founder Chris Malachowsky, the building was designed to unite computing, engineering, medicine, and health sciences in a single collaborative environment.",
             "image_url": "https://www.eng.ufl.edu/wp-content/uploads/2023/10/malachowsky-exterior.jpg",
-            "professors": [
-                {
-                    "id": "mal-p1",
-                    "name": "Dr. Maya Alvarez",
-                    "department": "Emerging Technologies",
-                    "focus": "AI systems, product engineering, and applied machine learning.",
-                    "email": "maya.alvarez@ufl.edu",
-                    "linkedin_url": "https://www.linkedin.com/in/maya-alvarez-uf",
-                    "image_url": "https://placehold.co/400x400/1F1B3A/F8FAFC?text=MA"
-                },
-                {
-                    "id": "mal-p2",
-                    "name": "Prof. Jordan Patel",
-                    "department": "Applied Innovation",
-                    "focus": "Project mentorship, cross-functional collaboration, and opportunity design.",
-                    "email": "jordan.patel@ufl.edu",
-                    "linkedin_url": "https://www.linkedin.com/in/jordan-patel-uf",
-                    "image_url": "https://placehold.co/400x400/111827/F8FAFC?text=JP"
-                }
-            ]
+            "professors": MALACHOWSKY_CISE_DIRECTORY
         },
         {
             "name": "Reitz Union",
@@ -112,49 +106,13 @@ async def main():
     # Seed Opportunities
     print("\nSeeding opportunities...")
     opportunities_data = [
-        {
-            "building_id": str(building_ids["Malachowsky Hall"]),
-            "type": "research",
-            "title": "Machine Learning Research Assistant",
-            "description": "Contribute to a live faculty-led project connected to generative models and data workflows.",
-            "summary": "Open position in a faculty-led lab.",
-            "professor": "Dr. Maya Alvarez",
-            "professor_id": "mal-p1",
-            "tags": ["AI", "ML", "Python"],
-            "contact": "smith@example.edu",
-            "url": "https://example.com/ml-job",
-            "deadline": "2026-05-01",
-            "hourly_commitment": "8-10 hrs/week",
-            "pay": "$16-18/hr",
-            "goal_tags": ["research", "career"]
-        },
-        {
-            "building_id": str(building_ids["Malachowsky Hall"]),
-            "type": "job",
-            "title": "Cybersecurity Intern",
-            "description": "Help secure campus infrastructure and participate in security operations workflows.",
-            "summary": "Hands-on systems and security role.",
-            "professor": "Prof. Jordan Patel",
-            "professor_id": "mal-p2",
-            "tags": ["Security", "Linux"],
-            "contact": "hr@example.edu",
-            "hourly_commitment": "10-12 hrs/week",
-            "pay": "$18/hr",
-            "goal_tags": ["career"]
-        },
-        {
-            "building_id": str(building_ids["Malachowsky Hall"]),
-            "type": "event",
-            "title": "Open Lab Night",
-            "description": "A guided walk-through of spaces, mentors, and tools inside the building.",
-            "summary": "Guided event for students exploring the space.",
-            "professor": "Prof. Jordan Patel",
-            "professor_id": "mal-p2",
-            "tags": ["Community", "Labs"],
-            "hourly_commitment": "One evening",
-            "pay": "N/A",
-            "goal_tags": ["career", "research", "social_support"]
-        },
+        *[
+            {
+                "building_id": str(building_ids["Malachowsky Hall"]),
+                **opportunity,
+            }
+            for opportunity in MALACHOWSKY_RESEARCH_OPPORTUNITIES
+        ],
         {
             "building_id": str(building_ids["Reitz Union"]),
             "type": "student_org",
