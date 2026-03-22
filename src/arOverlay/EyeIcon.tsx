@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import {
   Animated,
+  Easing,
   Pressable,
   StyleSheet,
   type ViewStyle,
@@ -31,10 +32,10 @@ export default function EyeIcon({ onPress, x, y, themeColor = '#FFFFFF' }: EyeIc
   const popAnim = useRef(new Animated.Value(0.86)).current;
 
   useEffect(() => {
-    Animated.spring(popAnim, {
+    Animated.timing(popAnim, {
       toValue: 1,
-      friction: 5,
-      tension: 300,
+      duration: 140,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [popAnim]);

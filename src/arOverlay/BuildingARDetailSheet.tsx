@@ -15,12 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -74,10 +74,14 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
   } | null>(null);
   const [buildingOpportunities, setBuildingOpportunities] = useState<Opportunity[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const sheetTransition = React.useMemo(
+    () => ({ duration: 180, easing: Easing.out(Easing.cubic) }),
+    []
+  );
 
   React.useEffect(() => {
-    translateY.value = withSpring(0, { damping: 20, stiffness: 180 });
-  }, [translateY]);
+    translateY.value = withTiming(0, sheetTransition);
+  }, [sheetTransition, translateY]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -109,7 +113,7 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
   }, [building.id]);
 
   const closeSheet = React.useCallback(() => {
-    translateY.value = withTiming(900, { duration: 220 }, (finished) => {
+    translateY.value = withTiming(900, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
       if (finished) runOnJS(onClose)();
     });
   }, [onClose, translateY]);
@@ -122,11 +126,11 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     })
     .onEnd((event) => {
       if (event.translationY > CLOSE_THRESHOLD || event.velocityY > 900) {
-        translateY.value = withTiming(900, { duration: 220 }, (finished) => {
+        translateY.value = withTiming(900, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
           if (finished) runOnJS(onClose)();
         });
       } else {
-        translateY.value = withSpring(0, { damping: 20, stiffness: 180 });
+        translateY.value = withTiming(0, sheetTransition);
       }
     });
 
@@ -338,10 +342,6 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
       </Animated.View>
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.sheet, sheetStyle]}>
-          <View style={styles.handleWrap}>
-            <View style={styles.handle} />
-          </View>
-
           <ScrollView
             bounces={false}
             showsVerticalScrollIndicator={false}
@@ -351,6 +351,9 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             <View>
               <ImageBackground source={{ uri: buildingDetail?.image_url || building.image_url || HERO_PLACEHOLDER }} style={styles.hero} imageStyle={styles.heroImage}>
                 <LinearGradient colors={['rgba(11,11,15,0.08)', 'rgba(11,11,15,0.92)']} style={styles.heroOverlay}>
+                  <View style={styles.handleWrap}>
+                    <View style={styles.handle} />
+                  </View>
                   <View style={styles.heroTopRow}>
                     <View style={[styles.heroBadge, { backgroundColor: `${accentColor}33` }]}>
                       <Ionicons name="business-outline" size={16} color={theme.colors.textOnAccent} />
@@ -430,15 +433,14 @@ const styles = StyleSheet.create({
   },
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
-    backgroundColor: theme.colors.backgroundPrimary,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   handle: {
     width: 42,
     height: 5,
     borderRadius: 999,
-    backgroundColor: theme.colors.whiteSoft,
+    backgroundColor: 'rgba(255,255,255,0.42)',
   },
   scrollContent: {
     paddingBottom: 36,
@@ -455,6 +457,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     padding: 18,
+    paddingTop: 10,
   },
   heroTopRow: {
     flexDirection: 'row',

@@ -17,8 +17,8 @@ async def main():
         {
             "name": "Malachowsky Hall",
             "short_name": "MAL",
-            "lat": 25.803783,
-            "lng": -80.335860,
+            "lat": 28.348565,
+            "lng": -81.237858,
             "departments": ["Computer Science", "Electrical Engineering", "Data Science"],
             "description": "A high-tech academic hub used here as the live AR test building, seeded with placeholder details for engineering, AI, and student project discovery.",
             "image_url": "https://www.eng.ufl.edu/wp-content/uploads/2023/10/malachowsky-exterior.jpg",

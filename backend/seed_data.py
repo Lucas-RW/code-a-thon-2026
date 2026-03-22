@@ -15,7 +15,7 @@ def seed():
             "_id": "bldg_malachowsky",
             "name": "Malachowsky Hall",
             "short_name": "MAL",
-            "lat": 29.6444, "lng": -82.3478,
+            "lat": 28.348632, "lng": -81.237896,
             "departments": ["Computer Science", "Electrical Engineering"],
             "description": "UF's state-of-the-art AI and Data Science hub.",
             "source": "manual"
