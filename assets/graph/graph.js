@@ -1,5 +1,8 @@
 // graph.js
 (function () {
+    const getStarPath = (R, r = R / 2.5) => {
+        return `M 0,-${R} L ${r},-${r} L ${R},0 L ${r},${r} L 0,${R} L -${r},${r} L -${R},0 L -${r},-${r} Z`;
+    };
     const COLORS = {
         skill: "#60a5fa",       // Vibrant Blue
         building: "#34d399",    // Emerald Green
@@ -109,17 +112,23 @@
                 .on("drag", dragged)
                 .on("end", dragended));
 
-        const outerCircle = nodeGroup.append("circle")
+        const outerCircle = nodeGroup.append("path")
             .attr("class", "glow-circle")
-            .attr("r", d => d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18))
+            .attr("d", d => {
+                const R = d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18);
+                return getStarPath(R);
+            })
             .attr("data-base-r", d => d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18))
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fde047' : (COLORS[d.type] || COLORS.default)))
             .style("filter", "url(#glow)")
             .style("opacity", 0.5);
 
-        const innerCircle = nodeGroup.append("circle")
+        const innerCircle = nodeGroup.append("path")
             .attr("class", "node-circle")
-            .attr("r", d => d.type === 'me' ? 16 : (d.type === 'gold' ? 20 : 14))
+            .attr("d", d => {
+                const R = d.type === 'me' ? 16 : (d.type === 'gold' ? 20 : 14);
+                return getStarPath(R);
+            })
             .attr("data-base-r", d => d.type === 'me' ? 16 : (d.type === 'gold' ? 20 : 14))
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fbbf24' : (COLORS[d.type] || COLORS.default)))
             .style("stroke", "#fff")
@@ -366,18 +375,14 @@
             .style("opacity", 1);
 
         // Pulse: scale up then back down
-        const circles = sel.selectAll("circle");
-        circles
+        const paths = sel.selectAll("path");
+        paths
             .transition()
             .duration(REVEAL_FADE_MS * 0.4)
-            .attr("r", function () {
-                return +d3.select(this).attr("data-base-r") * 1.5;
-            })
+            .attr("transform", "scale(1.5)")
             .transition()
             .duration(REVEAL_FADE_MS * 0.6)
-            .attr("r", function () {
-                return +d3.select(this).attr("data-base-r");
-            });
+            .attr("transform", "scale(1)");
 
         // Gold node gets extra glow burst
         if (isGold) {
