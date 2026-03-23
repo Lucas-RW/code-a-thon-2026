@@ -8,9 +8,22 @@
         default: "#94a3b8"
     };
 
-    let skillsSimulation, networkSimulation;
+    const REVEAL_DELAY_MS = 500;   // gap between each node lighting up
+    const REVEAL_FADE_MS  = 600;   // duration of each fade-in transition
+    const SETTLE_MS       = 800;   // let the physics settle before revealing
 
-    function initGraph(svgId, data) {
+    let networkSimulation;
+    let isAnimating = false;       // block clicks/drags during the reveal
+    let pendingTimers = [];        // track all reveal setTimeout IDs
+
+    function cancelPendingReveal() {
+        pendingTimers.forEach(id => clearTimeout(id));
+        pendingTimers = [];
+        isAnimating = false;
+    }
+
+    function initGraph(svgId, data, skipReveal) {
+        cancelPendingReveal();     // cancel any in-flight animation from a previous path
         const svg = d3.select(svgId);
         svg.selectAll("*").remove(); 
         
@@ -18,13 +31,8 @@
         const width = rect.width || 400;
         const height = rect.height || 450;
 
-        // Selection state is handled in populateFromPath or explicitly via messages
-
         const simulation = d3.forceSimulation(data.nodes)
             .force("link", d3.forceLink(data.links).id(d => d.id).distance(110).strength(l => {
-                // IMPORTANT: Only give physical tension to the direct spine and buildings.
-                // "Jump" links must have 0 strength so they don't pull the graph into a ball, 
-                // but they MUST be in the simulation so D3 resolves their source/target references.
                 if (l.isSpine || l.isSecondary) return 1;
                 return 0;
             }))
@@ -33,6 +41,8 @@
             .force("collision", d3.forceCollide().radius(60));
 
         const defs = svg.append("defs");
+
+        // Standard glow filter
         const filter = defs.append("filter")
             .attr("id", "glow")
             .attr("x", "-50%")
@@ -48,22 +58,42 @@
         feMerge.append("feMergeNode").attr("in", "blur");
         feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
+        // Intense glow for the gold node reveal burst
+        const burstFilter = defs.append("filter")
+            .attr("id", "glow-burst")
+            .attr("x", "-100%")
+            .attr("y", "-100%")
+            .attr("width", "300%")
+            .attr("height", "300%");
+        
+        burstFilter.append("feGaussianBlur")
+            .attr("stdDeviation", "8")
+            .attr("result", "blur");
+        
+        const burstMerge = burstFilter.append("feMerge");
+        burstMerge.append("feMergeNode").attr("in", "blur");
+        burstMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+        // ── Links ──
         const link = svg.append("g")
             .selectAll("line")
             .data(data.links)
             .enter().append("line")
             .attr("class", d => d.isSecondary ? "secondary-line" : "power-line")
-            .style("stroke", d => (d.source.selected && d.target.selected) ? (d.isSecondary ? "#34d399" : "#fbbf24") : "#1e293b")
-            .style("stroke-opacity", d => (d.source.selected && d.target.selected) ? 0.8 : 0.1)
-            .style("stroke-width", d => (d.source.selected && d.target.selected) ? (d.isSecondary ? 2 : 4) : 1)
-            .style("stroke-dasharray", d => d.isSecondary ? "4,4" : "none")
-            .style("transition", "all 0.3s ease");
+            .style("stroke", "#1e293b")
+            .style("stroke-opacity", 0)
+            .style("stroke-width", 1)
+            .style("stroke-dasharray", d => d.isSecondary ? "4,4" : "none");
 
+        // ── Node groups ──
         const nodeGroup = svg.append("g")
             .selectAll("g")
             .data(data.nodes)
             .enter().append("g")
+            .style("opacity", 0)                       // start fully hidden
+            .style("pointer-events", "none")            // no interaction during reveal
             .on("click", (event, d) => {
+                if (isAnimating) return;
                 event.stopPropagation();
                 toggleNode(d);
                 showMiniCard(d);
@@ -78,7 +108,7 @@
             .attr("r", d => d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18))
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fde047' : (COLORS[d.type] || COLORS.default)))
             .style("filter", "url(#glow)")
-            .style("opacity", d => d.selected ? 0.5 : 0.1);
+            .style("opacity", 0.5);
 
         const innerCircle = nodeGroup.append("circle")
             .attr("class", "node-circle")
@@ -86,14 +116,14 @@
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fbbf24' : (COLORS[d.type] || COLORS.default)))
             .style("stroke", "#fff")
             .style("stroke-width", 2)
-            .style("opacity", d => d.selected ? 1 : 0.3);
+            .style("opacity", 1);
 
         nodeGroup.append("text")
             .attr("dy", 40)
             .style("font-size", "13px")
             .style("font-weight", "900")
             .style("fill", "#fff")
-            .style("opacity", d => d.selected ? 1 : 0.4)
+            .style("opacity", 1)
             .style("text-anchor", "middle")
             .style("text-shadow", "0 2px 5px rgba(0,0,0,0.9)")
             .text(d => d.label);
@@ -110,6 +140,7 @@
         });
 
         function toggleNode(d) {
+            if (isAnimating) return;
             if (d.type === 'me' || d.type === 'building') return;
             d.selected = !d.selected;
             updateVisuals();
@@ -120,10 +151,9 @@
         }
 
         function updateVisuals() {
-            // First, sync buildings selection with their target opportunities
+            // Sync buildings selection with their target opportunities
             data.links.forEach(l => {
                 if (l.isSecondary) {
-                    // building -> opportunity link
                     const b = l.source;
                     const o = l.target;
                     if (b.type === 'building' && o.type !== 'building') {
@@ -146,18 +176,16 @@
                 .style("stroke-opacity", 0.1)
                 .style("stroke-width", 1);
 
-            // 2. Identify all selected path nodes (ME + Opportunities/Gold + Alts)
-            // We sort them by their internal sequence 'order' or hierarchy
+            // 2. Identify selected path nodes
             const selectedNodes = data.nodes
                 .filter(n => n.selected && (n.type === 'me' || n.type === 'opportunity' || n.type === 'gold' || n.isAlt))
                 .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-            // 3. Highlight the spine: Link consecutive selected nodes
+            // 3. Highlight the spine
             for (let i = 0; i < selectedNodes.length - 1; i++) {
                 const sId = selectedNodes[i].id;
                 const tId = selectedNodes[i+1].id;
                 
-                // Highlight any simulation link that connects these two
                 svg.selectAll(".power-line")
                     .filter(l => (l.source.id === sId && l.target.id === tId) || (l.source.id === tId && l.target.id === sId))
                     .style("stroke", "#fbbf24")
@@ -201,23 +229,189 @@
         });
 
         function dragstarted(event) {
+            if (isAnimating) return;
             if (!event.active) simulation.alphaTarget(0.3).restart();
             event.subject.fx = event.subject.x;
             event.subject.fy = event.subject.y;
         }
         function dragged(event) {
+            if (isAnimating) return;
             event.subject.fx = event.x;
             event.subject.fy = event.y;
         }
         function dragended(event) {
+            if (isAnimating) return;
             if (!event.active) simulation.alphaTarget(0);
             event.subject.fx = null;
             event.subject.fy = null;
         }
 
+        // ── Reveal animation ──
+        if (!skipReveal) {
+            revealPathSequentially(data, svg, nodeGroup, link, simulation, updateVisuals);
+        } else {
+            // No animation — show everything immediately
+            nodeGroup.style("opacity", 1).style("pointer-events", "all");
+            link.style("stroke-opacity", d => (d.source.selected && d.target.selected) ? 0.8 : 0.1);
+            updateVisuals();
+        }
+
         return simulation;
     }
 
+    // ────────────────────────────────────────────────────────
+    //  Sequential path reveal animation
+    // ────────────────────────────────────────────────────────
+    function revealPathSequentially(data, svg, nodeGroup, link, simulation, updateVisuals) {
+        isAnimating = true;
+
+        // Build the ordered reveal sequence: ME → opp1 → opp2 → … → gold
+        const spineNodes = data.nodes
+            .filter(n => n.selected && (n.type === 'me' || n.type === 'opportunity' || n.type === 'gold'))
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Map each opp node to its associated building + secondary link
+        const oppToBuildingMap = {};
+        data.links.forEach(l => {
+            if (l.isSecondary) {
+                const src = typeof l.source === 'object' ? l.source : data.nodes.find(n => n.id === l.source);
+                const tgt = typeof l.target === 'object' ? l.target : data.nodes.find(n => n.id === l.target);
+                if (src && tgt) {
+                    if (src.type === 'building') oppToBuildingMap[tgt.id] = src.id;
+                    else if (tgt.type === 'building') oppToBuildingMap[src.id] = tgt.id;
+                }
+            }
+        });
+
+        // Let physics settle before we start revealing
+        pendingTimers.push(setTimeout(() => {
+            simulation.alphaTarget(0); // cool down
+            
+            spineNodes.forEach((node, index) => {
+                pendingTimers.push(setTimeout(() => {
+                    // ── Reveal this spine node ──
+                    revealNode(nodeGroup, node, node.type === 'gold');
+
+                    // ── Reveal the link connecting to the previous node ──
+                    if (index > 0) {
+                        const prevId = spineNodes[index - 1].id;
+                        revealLinkBetween(link, prevId, node.id);
+                    }
+
+                    // ── Reveal associated building node + secondary link ──
+                    const buildingId = oppToBuildingMap[node.id];
+                    if (buildingId) {
+                        const buildingNode = data.nodes.find(n => n.id === buildingId);
+                        if (buildingNode) {
+                            pendingTimers.push(setTimeout(() => {
+                                revealNode(nodeGroup, buildingNode, false);
+                                revealSecondaryLink(link, buildingId, node.id);
+                            }, REVEAL_FADE_MS * 0.3));
+                        }
+                    }
+
+                    // ── After the last node: reveal alt nodes, unlock interactions ──
+                    if (index === spineNodes.length - 1) {
+                        pendingTimers.push(setTimeout(() => {
+                            // Reveal any alt nodes that weren't on the spine
+                            const altNodes = data.nodes.filter(n => n.isAlt);
+                            altNodes.forEach((alt, ai) => {
+                                pendingTimers.push(setTimeout(() => {
+                                    revealNode(nodeGroup, alt, false);
+                                    // Reveal building link for alt too
+                                    const altBldg = oppToBuildingMap[alt.id];
+                                    if (altBldg) {
+                                        const bNode = data.nodes.find(n => n.id === altBldg);
+                                        if (bNode) revealNode(nodeGroup, bNode, false);
+                                        revealSecondaryLink(link, altBldg, alt.id);
+                                    }
+                                }, ai * 200));
+                            });
+
+                            // Unlock
+                            pendingTimers.push(setTimeout(() => {
+                                isAnimating = false;
+                                nodeGroup.style("pointer-events", "all");
+                                updateVisuals();
+                            }, altNodes.length * 200 + 300));
+                        }, REVEAL_FADE_MS));
+                    }
+
+                }, index * REVEAL_DELAY_MS));
+            });
+
+        }, SETTLE_MS));
+    }
+
+    function revealNode(nodeGroup, nodeData, isGold) {
+        const sel = nodeGroup.filter(d => d.id === nodeData.id);
+
+        // Fade the whole group in
+        sel.transition()
+            .duration(REVEAL_FADE_MS)
+            .style("opacity", 1);
+
+        // Pulse: scale up then back down
+        const circles = sel.selectAll("circle");
+        circles
+            .transition()
+            .duration(REVEAL_FADE_MS * 0.4)
+            .attr("r", function () {
+                return +d3.select(this).attr("r") * 1.5;
+            })
+            .transition()
+            .duration(REVEAL_FADE_MS * 0.6)
+            .attr("r", function () {
+                return +d3.select(this).attr("r") / 1.5;
+            });
+
+        // Gold node gets extra glow burst
+        if (isGold) {
+            sel.selectAll(".glow-circle")
+                .style("filter", "url(#glow-burst)")
+                .transition()
+                .duration(1200)
+                .style("opacity", 0.8)
+                .transition()
+                .duration(800)
+                .style("opacity", 0.5)
+                .style("filter", "url(#glow)");
+        }
+    }
+
+    function revealLinkBetween(linkSel, sourceId, targetId) {
+        linkSel
+            .filter(l => {
+                const sId = typeof l.source === 'object' ? l.source.id : l.source;
+                const tId = typeof l.target === 'object' ? l.target.id : l.target;
+                return ((sId === sourceId && tId === targetId) || (sId === targetId && tId === sourceId))
+                    && (l.isSpine || l.isJump);
+            })
+            .transition()
+            .duration(REVEAL_FADE_MS)
+            .style("stroke", "#fbbf24")
+            .style("stroke-opacity", 0.9)
+            .style("stroke-width", 4)
+            .style("filter", "url(#glow)");
+    }
+
+    function revealSecondaryLink(linkSel, buildingId, oppId) {
+        linkSel
+            .filter(l => {
+                const sId = typeof l.source === 'object' ? l.source.id : l.source;
+                const tId = typeof l.target === 'object' ? l.target.id : l.target;
+                return l.isSecondary && ((sId === buildingId && tId === oppId) || (sId === oppId && tId === buildingId));
+            })
+            .transition()
+            .duration(REVEAL_FADE_MS)
+            .style("stroke", "#34d399")
+            .style("stroke-opacity", 0.6)
+            .style("stroke-width", 2);
+    }
+
+    // ────────────────────────────────────────────────────────
+    //  Data → Graph pipeline
+    // ────────────────────────────────────────────────────────
     function populateFromPath(path, alternatives = []) {
         const networkNodes = [];
         const networkLinks = [];
@@ -234,7 +428,7 @@
         });
         nodeSet.add(meId);
 
-        // 1. Add all potential Opp/Alt nodes to ensure we have every possible jump target
+        // 1. Add all potential Opp/Alt nodes
         const allOpps = [
             ...path.map((s, i) => ({ ...s, isMain: true, nodeOrder: i + 1 })),
             ...alternatives.map((a, i) => ({ ...a, isAlt: true, nodeOrder: (a.order || 1) + 0.5 }))
@@ -265,7 +459,7 @@
                     desc: opp.short_reason || opp.description,
                     order: opp.nodeOrder,
                     isAlt: !!opp.isAlt,
-                    selected: !!opp.isMain // Only main milestones selected by default
+                    selected: !!opp.isMain
                 });
                 nodeSet.add(oId);
 
@@ -275,20 +469,19 @@
             }
         });
 
-        // 4. MASTER Sequence: Get all potential path/alt nodes in order
+        // 4. Master sequence
         const masterSequence = networkNodes
             .filter(n => n.type === 'me' || n.type === 'opportunity' || n.type === 'gold' || n.isAlt)
             .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-        // 5. Connect each node to ALL subsequent nodes in the sequence
-        // We mark them as "Jump" links so they don't affect physics, only highlighting
+        // 5. Connect each node to all subsequent nodes
         for (let i = 0; i < masterSequence.length; i++) {
             for (let j = i + 1; j < masterSequence.length; j++) {
                 networkLinks.push({ 
                     source: masterSequence[i].id, 
                     target: masterSequence[j].id, 
-                    isSpine: j === i + 1, // Direct backbone (for physics)
-                    isJump: j > i + 1     // Multi-step skip (for highlighting)
+                    isSpine: j === i + 1,
+                    isJump: j > i + 1
                 });
             }
         }
@@ -301,7 +494,7 @@
             n.y = h / 2 + (Math.random() - 0.5) * 60;
         });
 
-        networkSimulation = initGraph("#network-graph", { nodes: networkNodes, links: networkLinks });
+        networkSimulation = initGraph("#network-graph", { nodes: networkNodes, links: networkLinks }, false);
     }
 
     function populateDefaultGraph() {
