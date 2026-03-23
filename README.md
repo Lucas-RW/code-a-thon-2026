@@ -158,33 +158,6 @@ The API will be available at `http://localhost:8000`. You can view the auto-gene
 
 ---
 
-## Docker Setup (Recommended)
-
-The easiest way to get everything running (including a local MongoDB database) is using Docker Compose.
-
-### 1. Requirements
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
-
-### 2. Start all services
-
-```bash
-docker-compose up --build
-```
-
-This will:
-1.  Start a **local MongoDB instance** (no Atlas account needed!).
-2.  Start the **FastAPI backend** and connect it to the local DB.
-
-The API will be available at `http://localhost:8000`.
-
-### 3. Switching back to Atlas
-
-If you want to use MongoDB Atlas instead of the local Docker DB:
-1.  Open `docker-compose.yml`.
-2.  Comment out the `environment:` section under the `backend` service.
-3.  The backend will then use the `MONGODB_URI` from your `backend/.env` file.
-
 ---
 
 ## Environment Variable Reference
@@ -286,22 +259,23 @@ git branch -d your-branch-name
 ```
 .
 ├── app/                  # Expo app screens (file-based routing)
-│   ├── auth/             # Login & registration screens
-│   ├── (tabs)/           # Main tab screens
-│   └── building/         # Building detail screen
-├── components/           # Shared UI components
-├── context/              # React context (Auth, Toast)
-├── lib/                  # API client and utilities
-│   ├── api.ts            # All API calls
-│   └── storage.ts        # Cross-platform secure storage wrapper
-├── backend/              # Python FastAPI backend
-│   ├── app/
-│   │   ├── main.py       # FastAPI app and all routes
-│   │   ├── auth.py       # JWT + password hashing
-│   │   ├── db.py         # MongoDB connection
-│   │   ├── models.py     # Pydantic data models
-│   │   └── config.py     # Environment variable loading
-│   └── requirements.txt
-├── .env                  # Frontend env vars
-└── .env.example          # Frontend env template
+│   ├── (tabs)/           # Main tab navigation
+│   ├── auth/             # Login & registration flows
+│   ├── building/         # Building & opportunity detail screens
+│   ├── dev/              # Developer & demo screens (AI bootstrap, AR)
+│   └── profile-builder/  # Onboarding/Profile setup flow
+├── assets/               # Static assets & graph visualization files
+├── components/           # Reusable UI components (Modals, Trees, etc.)
+├── context/              # React Context providers (Auth, Theme, etc.)
+├── hooks/                # Custom React hooks (AR, etc.)
+├── lib/                  # Shared utilities and API client
+├── src/                  # Core application logic components
+│   └── arOverlay/        # Augmented Reality overlay logic
+└── backend/              # Python FastAPI backend
+    ├── app/              # Core API application logic
+    │   ├── main.py       # API routes and entry point
+    │   ├── models.py     # Pydantic data schemas
+    │   ├── ai_client.py  # AI integration & relevance scoring
+    │   └── auth.py       # Authentication & JWT logic
+    └── scripts/          # Database seeding & utility scripts
 ```

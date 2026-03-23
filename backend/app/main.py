@@ -11,7 +11,7 @@ from pathlib import Path
 from .db import database
 from .utils import serialize_mongo_document
 from .models import (
-    User, UserAuth, AuthRegister, AuthLogin, Token, UserUpdate, InterestRequest,
+    AuthRegister, AuthLogin, Token, UserUpdate, InterestRequest,
     PathfindRequest, PathfindResponse, PathStep,
     AIBootstrapBuildingRequest, AIBootstrapBuildingResponse,
     SaveAIBootstrapRequest, Building, Opportunity,
