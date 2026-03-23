@@ -1,6 +1,15 @@
 # CampusLens
 
-A campus opportunity discovery app built with Expo (React Native) and a Python FastAPI backend.
+**CampusLens** helps students discover opportunities on campus — clubs, research positions, events, and more — through an interactive skill-tree graph, AI-powered career pathfinding, and AR exploration. Built with Expo (React Native) and a Python FastAPI backend.
+
+### Key Features
+
+- **Skill-tree graph** — visualize how opportunities connect and build toward your goals
+- **AI pathfinding** — get personalized milestone recommendations based on your profile
+- **Profile builder** — guided onboarding to capture your interests, skills, and career goals
+- **AR campus overlay** — discover opportunities by pointing your camera at campus buildings
+- **Golden path** — curated sequences of opportunities tailored to your trajectory
+- **Opportunity tracking** — save and manage opportunities you're interested in
 
 ---
 
@@ -258,24 +267,32 @@ git branch -d your-branch-name
 
 ```
 .
-├── app/                  # Expo app screens (file-based routing)
-│   ├── (tabs)/           # Main tab navigation
-│   ├── auth/             # Login & registration flows
-│   ├── building/         # Building & opportunity detail screens
-│   ├── dev/              # Developer & demo screens (AI bootstrap, AR)
-│   └── profile-builder/  # Onboarding/Profile setup flow
-├── assets/               # Static assets & graph visualization files
-├── components/           # Reusable UI components (Modals, Trees, etc.)
-├── context/              # React Context providers (Auth, Theme, etc.)
-├── hooks/                # Custom React hooks (AR, etc.)
-├── lib/                  # Shared utilities and API client
-├── src/                  # Core application logic components
-│   └── arOverlay/        # Augmented Reality overlay logic
-└── backend/              # Python FastAPI backend
-    ├── app/              # Core API application logic
-    │   ├── main.py       # API routes and entry point
-    │   ├── models.py     # Pydantic data schemas
-    │   ├── ai_client.py  # AI integration & relevance scoring
-    │   └── auth.py       # Authentication & JWT logic
-    └── scripts/          # Database seeding & utility scripts
+├── app/                      # Expo app screens (file-based routing)
+│   ├── (tabs)/               # Main navigation
+│   │   ├── index.tsx         # Home / Discovery feed
+│   │   ├── golden-path.tsx   # AI career path discovery
+│   │   ├── graph.tsx         # Connection graph view
+│   │   ├── my-opportunities.tsx # Saved interests
+│   │   └── profile.tsx       # Profile & skills overview
+│   ├── auth/                 # Login & registration flows
+│   ├── building/             # Building & opportunity details
+│   ├── dev/                  # Developer tools (AI bootstrap)
+│   └── profile-builder/      # Onboarding flows
+├── components/               # Shared UI components
+│   ├── SkillTree.tsx         # Interactive skill-tree viz
+│   ├── MagicButton.tsx       # Main action button
+│   └── ...
+├── context/                  # React context providers
+│   ├── AuthContext.tsx        # Auth state mgmt
+│   ├── GraphContext.tsx       # Skill-tree data mgmt
+│   ├── OnboardingContext.tsx  # Flow tracking
+│   └── ToastContext.tsx      # App notifications
+├── hooks/                    # Custom React hooks (AR, etc.)
+├── lib/                      # Shared utilities & API client
+├── src/arOverlay/            # AR overlay assets & logic
+└── backend/                  # Python FastAPI backend
+    ├── app/                  # REST API application (main, models, ai_client, etc.)
+    └── scripts/              # Data seeding & utility scripts
+├── .env                      # App environment variables
+└── .env.example              # Env template
 ```
