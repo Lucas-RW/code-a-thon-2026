@@ -22,10 +22,6 @@ export interface ProjectedBuilding {
 
 export interface ARCameraResult {
   projected: ProjectedBuilding[];
-  debugLat: number | null;
-  debugLng: number | null;
-  debugHeading: number | null;
-  debugInfo: string;
 }
 
 const MAX_DISTANCE_METERS = 500;
@@ -67,13 +63,8 @@ export function useARCamera(buildings: BuildingCoord[]): ARCameraResult {
   // 3. Project buildings to screen coordinates
   const { location, heading } = deviceState;
 
-  const debugLat = location?.coords.latitude ?? null;
-  const debugLng = location?.coords.longitude ?? null;
-  const debugHeading = heading;
-
   if (!location || heading === null || buildings.length === 0) {
-    const reason = !location ? 'no-gps' : heading === null ? 'no-heading' : 'no-buildings';
-    return { projected: [], debugLat, debugLng, debugHeading, debugInfo: reason };
+    return { projected: [] };
   }
 
   const userLat = location.coords.latitude;
@@ -96,12 +87,7 @@ export function useARCamera(buildings: BuildingCoord[]): ARCameraResult {
     })
     .filter((b): b is ProjectedBuilding => b !== null);
 
-  const firstB = buildings[0];
-  const dist0 = getDistance(userLat, userLng, firstB.lat, firstB.lng);
-  const bear0 = getBearing(userLat, userLng, firstB.lat, firstB.lng);
-  const info = `b:${buildings.length} dist:${Math.round(dist0)}m bear:${bear0.toFixed(0)}° proj:${projected.length}`;
-
-  return { projected, debugLat, debugLng, debugHeading, debugInfo: info };
+  return { projected };
 }
 
 // ── Math Helpers ──────────────────────────────────────────────────────────────

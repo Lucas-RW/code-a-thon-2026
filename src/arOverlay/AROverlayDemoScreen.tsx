@@ -51,7 +51,7 @@ export default function AROverlayDemoScreen() {
     buildings.map(b => ({ id: b.id, lat: b.lat, lng: b.lng })),
   [buildings]);
   
-  const { projected: projectedData, debugLat, debugLng, debugHeading } = useARCamera(buildingCoords);
+  const { projected: projectedData } = useARCamera(buildingCoords);
 
   // 3. Merge projected data with building details
   const arBuildings: ARBuilding[] = useMemo(() => {
@@ -94,14 +94,6 @@ export default function AROverlayDemoScreen() {
         <AROverlayLayer buildings={arBuildings} />
       )}
 
-      {/* ── Debug overlay — remove before shipping ── */}
-      <View style={[styles.debugOverlay, { pointerEvents: 'none' }]}>
-        <Text style={styles.debugText}>
-          lat: {debugLat?.toFixed(6) ?? '…'}{'\n'}
-          lng: {debugLng?.toFixed(6) ?? '…'}{'\n'}
-          heading: {debugHeading?.toFixed(1) ?? '…'}°
-        </Text>
-      </View>
 
       <TouchableOpacity style={styles.flipButton} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
         <Ionicons name="camera-reverse-outline" size={30} color="white" />
@@ -138,19 +130,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  debugOverlay: {
-    position: 'absolute',
-    top: 60,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 8,
-    padding: 8,
-  },
-  debugText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'monospace',
-    lineHeight: 18,
   },
 });

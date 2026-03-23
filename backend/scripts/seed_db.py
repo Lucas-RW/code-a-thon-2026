@@ -27,8 +27,8 @@ async def main():
         {
             "name": "Malachowsky Hall",
             "short_name": "MAL",
-            "lat": 29.647921,
-            "lng": -82.343946,
+            "lat": 29.6435,
+            "lng": -82.347802,
             "departments": [
                 "Computer & Information Science & Engineering",
                 "Electrical & Computer Engineering",
@@ -50,7 +50,7 @@ async def main():
             "name": "Reitz Union",
             "short_name": "REITZ",
             "lat": 29.6465,
-            "lng": -82.3478,
+            "lng": -82.3475,
             "departments": ["Student Affairs", "Campus Programs", "Student Organizations"],
             "description": "The central hub of student life, events, and community programming, used as a placeholder building for student-life recommendations in the AR experience.",
             "image_url": "https://walker-arch.com/wp-content/uploads/2018/01/reitz_front-elevation.jpg",
@@ -120,8 +120,8 @@ async def main():
         {
             "name": "New Engineering Building",
             "short_name": "NEB",
-            "lat": 29.6435,
-            "lng": -82.3475,
+            "lat": 30.6435,
+            "lng": -90.3475,
             "departments": ["Precision Engineering", "Robotics"],
             "description": "Focuses on advanced prototyping and robotics research.",
             "image_url": "https://www.eng.ufl.edu/news/wp-content/uploads/sites/249/2021/10/hero-hwlee.jpg",
