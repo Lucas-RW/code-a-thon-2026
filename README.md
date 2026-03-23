@@ -1,6 +1,15 @@
 # CampusLens
 
-A campus opportunity discovery app built with Expo (React Native) and a Python FastAPI backend.
+**CampusLens** helps students discover opportunities on campus — clubs, research positions, events, and more — through an interactive skill-tree graph, AI-powered career pathfinding, and AR exploration. Built with Expo (React Native) and a Python FastAPI backend.
+
+### Key Features
+
+- **Skill-tree graph** — visualize how opportunities connect and build toward your goals
+- **AI pathfinding** — get personalized milestone recommendations based on your profile
+- **Profile builder** — guided onboarding to capture your interests, skills, and career goals
+- **AR campus overlay** — discover opportunities by pointing your camera at campus buildings
+- **Golden path** — curated sequences of opportunities tailored to your trajectory
+- **Opportunity tracking** — save and manage opportunities you're interested in
 
 ---
 
@@ -285,23 +294,51 @@ git branch -d your-branch-name
 
 ```
 .
-├── app/                  # Expo app screens (file-based routing)
-│   ├── auth/             # Login & registration screens
-│   ├── (tabs)/           # Main tab screens
-│   └── building/         # Building detail screen
-├── components/           # Shared UI components
-├── context/              # React context (Auth, Toast)
-├── lib/                  # API client and utilities
-│   ├── api.ts            # All API calls
-│   └── storage.ts        # Cross-platform secure storage wrapper
-├── backend/              # Python FastAPI backend
+├── app/                      # Expo screens (file-based routing)
+│   ├── auth/                 # Login & registration
+│   ├── (tabs)/               # Main tab screens
+│   │   ├── explore.tsx       # Opportunity discovery feed
+│   │   ├── graph.tsx         # Skill-tree graph view
+│   │   ├── golden-path.tsx   # Curated opportunity sequences
+│   │   ├── buildings.tsx     # Campus buildings list
+│   │   ├── ar-demo.tsx       # AR camera overlay
+│   │   ├── profile.tsx       # User profile & settings
+│   │   └── my-opportunities.tsx
+│   ├── building/             # Building detail screen
+│   ├── profile-builder/      # Onboarding flow (basics → goals → details)
+│   └── dev/                  # Dev-only tools (AI bootstrap)
+├── components/               # Shared UI components
+│   ├── SkillTree.tsx         # Interactive skill-tree visualization
+│   ├── VoyagerOverlay.tsx    # AR overlay renderer
+│   ├── MagicButton.tsx       # Floating action button
+│   └── ...
+├── context/                  # React context providers
+│   ├── AuthContext.tsx        # Authentication state
+│   ├── GraphContext.tsx       # Skill-tree graph state
+│   ├── OnboardingContext.tsx  # Onboarding flow state
+│   ├── ProfileBuilderContext.tsx
+│   └── ToastContext.tsx
+├── hooks/                    # Custom React hooks
+│   └── useARCamera.ts        # AR camera integration
+├── lib/                      # API client and utilities
+│   ├── api.ts                # All API calls
+│   ├── graphMessaging.ts     # Graph event messaging
+│   ├── storage.ts            # Cross-platform secure storage
+│   └── theme.ts              # Design tokens and colors
+├── src/arOverlay/            # AR overlay assets and logic
+├── backend/                  # Python FastAPI backend
 │   ├── app/
-│   │   ├── main.py       # FastAPI app and all routes
-│   │   ├── auth.py       # JWT + password hashing
-│   │   ├── db.py         # MongoDB connection
-│   │   ├── models.py     # Pydantic data models
-│   │   └── config.py     # Environment variable loading
+│   │   ├── main.py           # FastAPI app and all routes
+│   │   ├── auth.py           # JWT + password hashing
+│   │   ├── db.py             # MongoDB connection
+│   │   ├── models.py         # Pydantic data models
+│   │   ├── config.py         # Environment variable loading
+│   │   ├── ai_client.py      # AI provider integration
+│   │   ├── graph_updates.py  # Skill-tree graph mutations
+│   │   └── utils.py          # Shared helpers
 │   └── requirements.txt
-├── .env                  # Frontend env vars
-└── .env.example          # Frontend env template
+├── docker-compose.yml        # Local dev with MongoDB + backend
+├── Dockerfile                # Backend container image
+├── .env                      # Frontend env vars
+└── .env.example              # Frontend env template
 ```
