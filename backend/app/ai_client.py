@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import httpx
 from .config import settings
 
@@ -131,6 +132,144 @@ In 1–2 sentences, explain why this is a good next step given their background 
         return f"A strong choice to advance your {goal_type} journey at {building_name}."
 
 
+# ── Batched relevance scoring ────────────────────────────────────────────────
+
+def _local_relevance_score(
+    opp: dict,
+    goal_type: str,
+    goal_keywords: list[str],
+) -> dict:
+    """
+    CPU-only fallback scorer based on keyword / tag overlap.
+    Returns {"opportunity_id", "relevance_score" (0-100), "short_reason"}.
+    """
+    score = 0
+    title = (opp.get("title") or "").lower()
+    desc = (opp.get("description") or "").lower()
+    tags = [t.lower() for t in opp.get("tags", [])]
+    goal_tags = [g.lower() for g in (opp.get("goal_tags") or [])]
+
+    # goal_type match is a strong signal
+    if goal_type.lower() in goal_tags:
+        score += 30
+
+    # keyword overlap with title/desc/tags
+    for kw in goal_keywords:
+        kw_lower = kw.lower()
+        if kw_lower in title:
+            score += 15
+        if kw_lower in desc:
+            score += 8
+        if kw_lower in tags:
+            score += 12
+
+    # Tag diversity bonus (more tags matched = broader relevance)
+    matched_tags = sum(1 for kw in goal_keywords if kw.lower() in tags)
+    score += min(matched_tags * 5, 15)
+
+    opp_title = opp.get("title", "this opportunity")
+    opp_type = opp.get("type", "opportunity")
+    matched = [kw for kw in goal_keywords if kw.lower() in title or kw.lower() in tags]
+    matched_str = ", ".join(matched[:3]) if matched else goal_type
+
+    return {
+        "opportunity_id": str(opp.get("id", opp.get("_id", ""))),
+        "relevance_score": min(score, 100),
+        "short_reason": (
+            f"This {opp_type} builds skills in {matched_str} that directly support your {goal_type} trajectory. "
+            f"Engaging with {opp_title} will strengthen your portfolio and expand your professional network in this area."
+        )
+    }
+
+
+async def score_opportunities_relevance(
+    goal_type: str,
+    goal_text: str | None,
+    user_profile_summary: str,
+    candidates: list[dict],
+) -> list[dict]:
+    """
+    Score a batch of candidate opportunities for relevance to the user's goal.
+    Returns a list of {"opportunity_id", "relevance_score" (0-100), "short_reason"}.
+    Falls back to local heuristic scoring if AI is unavailable.
+    """
+    goal_keywords = [w for w in (goal_text or goal_type).split() if len(w) > 1]
+
+    if not settings.AI_API_KEY or not candidates:
+        logger.info("AI unavailable or no candidates — using local relevance scorer")
+        return [_local_relevance_score(c, goal_type, goal_keywords) for c in candidates]
+
+    # Build a compact list for the prompt
+    opp_summaries = []
+    for i, c in enumerate(candidates):
+        opp_summaries.append(
+            f'{i+1}. id="{c.get("id", c.get("_id", ""))}" '
+            f'title="{c.get("title", "")}" '
+            f'type="{c.get("type", "")}" '
+            f'tags={c.get("tags", [])} '
+            f'desc="{(c.get("description") or "")[:120]}"'
+        )
+
+    prompt = f"""You are a career advisor scoring campus opportunities for a student.
+
+Student profile: {user_profile_summary}
+Goal type: {goal_type}
+Goal text: {goal_text or "not specified"}
+
+Opportunities:
+{chr(10).join(opp_summaries)}
+
+For EACH opportunity:
+1. Rate its relevance (0-100) to this student's specific goal.
+2. Write a personalized 2-3 sentence "reason" explaining HOW this opportunity advances their trajectory toward "{goal_text or goal_type}". Reference their major, year, or existing skills where relevant. Explain the concrete skills or connections they'll gain and why those matter for their goal. Do NOT just say "this is relevant" — be specific and actionable.
+
+Return ONLY a valid JSON array with objects: {{"id": "...", "score": 0-100, "reason": "..."}}.
+Order should match the input order. Return nothing else.""".strip()
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.AI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": settings.AI_MODEL,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            data = response.json()
+            content = data["choices"][0]["message"]["content"].strip()
+
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+            scored = json.loads(content)
+            if not isinstance(scored, list):
+                raise ValueError("AI response is not a JSON array")
+
+            # Normalize to our format
+            results = []
+            for item in scored:
+                results.append({
+                    "opportunity_id": str(item.get("id", "")),
+                    "relevance_score": max(0, min(100, int(item.get("score", 0)))),
+                    "short_reason": item.get("reason", "Relevant opportunity.")
+                })
+            return results
+
+    except Exception as e:
+        logger.error(f"AI relevance scoring failed, using local fallback: {e}")
+        return [_local_relevance_score(c, goal_type, goal_keywords) for c in candidates]
+
+
 async def ai_generate_building_and_opportunities(payload: any) -> any:
     """
     Call the AI model to generate a provisional building description
@@ -158,6 +297,8 @@ Building URL (may be None): {payload.building_url}
 1) Write a 1–2 sentence description of what this building is primarily known for.
 2) Guess the main departments or functions in this building as a short list.
 3) Propose 2–4 concrete student opportunities associated with this building.
+   IMPORTANT: Ensure a balanced mix — include at least one industry/career opportunity
+   (internship, job, career event) alongside any research positions where plausible.
    For each opportunity, return:
    - title
    - description (1–2 sentences)

@@ -351,11 +351,15 @@ async def get_interested_opportunities(current_user: dict = Depends(get_current_
 async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_current_user_profile)):
     """
     Generate a personalized 'Golden Path' of opportunities based on user goals and profile.
+    Uses AI relevance scoring to filter and rank candidates.
     Robustness: Returns a fallback path if AI or DB lookup fails.
     """
-    from .ai_client import generate_step_reason
+    from .ai_client import score_opportunities_relevance
     from .graph_updates import slugify
     import re
+    
+    RELEVANCE_THRESHOLD = 60   # minimum score to appear as an alternative
+    MAX_ALTERNATIVES = 8       # cap on alt nodes in the graph
     
     try:
         user_id = current_user["id"]
@@ -365,10 +369,10 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
         opps_collection = database.get_collection("opportunities")
         bldgs_collection = database.get_collection("buildings")
         
-        # 1. Broad keyword-based search
-        keywords = [re.escape(k) for k in goal_text.split() if len(k) > 1]
+        # ── 1. Broad candidate search (same as before) ──
+        keywords = [re.escape(k) for k in (goal_text or goal).split() if len(k) > 1]
         if not keywords:
-            keywords = [re.escape(goal_text)]
+            keywords = [re.escape(goal_text or goal)]
         
         search_filter = {
             "$or": [
@@ -378,38 +382,54 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
             ]
         }
         
-        # Fetch initial candidates
-        cursor = opps_collection.find(search_filter).limit(15)
+        cursor = opps_collection.find(search_filter).limit(20)
         all_candidates = []
         async for doc in cursor:
             all_candidates.append(serialize_mongo_document(doc))
             
-        # 2. Breadth expansion: If we have some results but < 10, search by tags of found results
-        if all_candidates and len(all_candidates) < 10:
+        # Breadth expansion via tags of found results
+        if all_candidates and len(all_candidates) < 15:
             found_tags = set()
             for cand in all_candidates:
                 found_tags.update(cand.get("tags", []))
             
-                tag_filter = {
-                    "tags": {"$in": list(found_tags)},
-                    "_id": {"$nin": [ObjectId(c["id"]) if len(c["id"]) == 24 else c["id"] for c in all_candidates]}
-                }
-                cursor = opps_collection.find(tag_filter).limit(15 - len(all_candidates))
-                async for doc in cursor:
-                    all_candidates.append(serialize_mongo_document(doc))
+            existing_ids = []
+            for c in all_candidates:
+                try:
+                    existing_ids.append(ObjectId(c["id"]))
+                except Exception:
+                    pass
+                existing_ids.append(c["id"])
+            
+            tag_filter = {
+                "tags": {"$in": list(found_tags)},
+                "_id": {"$nin": existing_ids}
+            }
+            cursor = opps_collection.find(tag_filter).limit(20 - len(all_candidates))
+            async for doc in cursor:
+                all_candidates.append(serialize_mongo_document(doc))
         
-        # 3. Goal-type expansion: If still < 12, fill with general goal matches
+        # Goal-type expansion
+        if len(all_candidates) < 15:
+            existing_ids = []
+            for c in all_candidates:
+                try:
+                    existing_ids.append(ObjectId(c["id"]))
+                except Exception:
+                    pass
+                existing_ids.append(c["id"])
+            
             goal_filter = {
                 "goal_tags": goal,
-                "_id": {"$nin": [ObjectId(c["id"]) if len(c["id"]) == 24 else c["id"] for c in all_candidates]}
+                "_id": {"$nin": existing_ids}
             }
-            cursor = opps_collection.find(goal_filter).limit(15 - len(all_candidates))
+            cursor = opps_collection.find(goal_filter).limit(20 - len(all_candidates))
             async for doc in cursor:
                 all_candidates.append(serialize_mongo_document(doc))
 
-        # 3. Fallback to goal_tags if still empty
+        # Fallback to goal_tags if still empty
         if not all_candidates:
-            cursor = opps_collection.find({"goal_tags": goal}).limit(12)
+            cursor = opps_collection.find({"goal_tags": goal}).limit(15)
             async for doc in cursor:
                 all_candidates.append(serialize_mongo_document(doc))
         
@@ -417,10 +437,43 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
         if not all_candidates:
             return PathfindResponse(steps=get_static_fallback_path(goal), alternatives=[])
 
-        # Separate candidates into main path (first 3) and alternatives (the rest)
+        # ── 2. Score all candidates for relevance ──
+        profile_summary = (
+            f"Name: {current_user.get('name', 'N/A')}, "
+            f"Major: {current_user.get('major', 'N/A')}, "
+            f"Year: {current_user.get('year', 'N/A')}, "
+            f"Goals: {', '.join(current_user.get('goals', []))}"
+        )
+        
+        scores = await score_opportunities_relevance(
+            goal_type=goal,
+            goal_text=goal_text,
+            user_profile_summary=profile_summary,
+            candidates=all_candidates,
+        )
+        
+        # Build a score lookup: opportunity_id -> {score, reason}
+        score_map = {}
+        for s in scores:
+            score_map[s["opportunity_id"]] = s
+        
+        # Attach scores to candidates and sort descending
+        for c in all_candidates:
+            cid = str(c.get("id", c.get("_id", "")))
+            info = score_map.get(cid, {"relevance_score": 0, "short_reason": ""})
+            c["_relevance_score"] = info["relevance_score"]
+            c["_short_reason"] = info["short_reason"]
+        
+        all_candidates.sort(key=lambda c: c["_relevance_score"], reverse=True)
+        
+        # ── 3. Split into golden path + relevant alternatives ──
         path_opps = all_candidates[:3]
-        alt_opps = all_candidates[3:15] # Return up to 12 alternatives (15 total nodes)
+        alt_opps = [
+            c for c in all_candidates[3:]
+            if c["_relevance_score"] >= RELEVANCE_THRESHOLD
+        ][:MAX_ALTERNATIVES]
 
+        # ── 4. Build PathSteps ──
         async def build_step(opp, order, is_alt=False):
             b_id = opp.get("building_id")
             try:
@@ -431,22 +484,10 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
             
             b_name = b_doc.get("name", "UF Campus") if b_doc else "UF Campus"
             
-            if not is_alt:
-                try:
-                    reason = await generate_step_reason(
-                        user_profile=current_user,
-                        goal_type=goal,
-                        goal_text=goal_text,
-                        opportunity_title=opp["title"],
-                        building_name=b_name
-                    )
-                except:
-                    reason = f"Essential milestone for {goal_text} development."
-            else:
-                reason = f"Excellent supplementary opportunity in {b_name} to broaden your {goal_text} exposure."
+            # Use the reason from AI scoring (already computed)
+            reason = opp.get("_short_reason") or f"Essential milestone for {goal_text or goal} development."
 
             skill_ids = [f"skill:{slugify(s)}" for s in opp.get("tags", [])[:2]]
-            # Use 'alt:' prefix for IDs if it's an alternative to help graph distinguish
             prefix = "alt" if is_alt else "opp"
             network_ids = [f"bldg:{b_id}", f"{prefix}:{str(opp['id'])}"]
 
@@ -473,7 +514,11 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
         for i, opp in enumerate(alt_opps):
             alternatives.append(await build_step(opp, len(steps) + i + 1, is_alt=True))
             
-        logger.info(f"Generated Path ({len(steps)}) + Alternatives ({len(alternatives)}) for user {user_id}")
+        logger.info(
+            f"Pathfind for user {user_id}: "
+            f"{len(steps)} golden steps + {len(alternatives)} relevant alts "
+            f"(filtered from {len(all_candidates)} candidates)"
+        )
         return PathfindResponse(steps=steps, alternatives=alternatives)
 
     except Exception as e:
