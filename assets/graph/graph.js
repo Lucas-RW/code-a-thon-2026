@@ -22,6 +22,12 @@
         isAnimating = false;
     }
 
+    function postGraphEvent(type) {
+        const msg = JSON.stringify({ type });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+        else if (window.parent) window.parent.postMessage(msg, "*");
+    }
+
     function initGraph(svgId, data, skipReveal) {
         cancelPendingReveal();     // cancel any in-flight animation from a previous path
         const svg = d3.select(svgId);
@@ -106,6 +112,7 @@
         const outerCircle = nodeGroup.append("circle")
             .attr("class", "glow-circle")
             .attr("r", d => d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18))
+            .attr("data-base-r", d => d.type === 'me' ? 22 : (d.type === 'gold' ? 28 : 18))
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fde047' : (COLORS[d.type] || COLORS.default)))
             .style("filter", "url(#glow)")
             .style("opacity", 0.5);
@@ -113,6 +120,7 @@
         const innerCircle = nodeGroup.append("circle")
             .attr("class", "node-circle")
             .attr("r", d => d.type === 'me' ? 16 : (d.type === 'gold' ? 20 : 14))
+            .attr("data-base-r", d => d.type === 'me' ? 16 : (d.type === 'gold' ? 20 : 14))
             .attr("fill", d => d.type === 'me' ? COLORS.me : (d.type === 'gold' ? '#fbbf24' : (COLORS[d.type] || COLORS.default)))
             .style("stroke", "#fff")
             .style("stroke-width", 2)
@@ -254,6 +262,7 @@
             nodeGroup.style("opacity", 1).style("pointer-events", "all");
             link.style("stroke-opacity", d => (d.source.selected && d.target.selected) ? 0.8 : 0.1);
             updateVisuals();
+            postGraphEvent("PATH_REVEAL_COMPLETE");
         }
 
         return simulation;
@@ -264,6 +273,8 @@
     // ────────────────────────────────────────────────────────
     function revealPathSequentially(data, svg, nodeGroup, link, simulation, updateVisuals) {
         isAnimating = true;
+        const revealedNodeIds = new Set();
+        const revealedSecondaryLinkIds = new Set();
 
         // Build the ordered reveal sequence: ME → opp1 → opp2 → … → gold
         const spineNodes = data.nodes
@@ -290,7 +301,7 @@
             spineNodes.forEach((node, index) => {
                 pendingTimers.push(setTimeout(() => {
                     // ── Reveal this spine node ──
-                    revealNode(nodeGroup, node, node.type === 'gold');
+                    revealNode(nodeGroup, node, node.type === 'gold', revealedNodeIds);
 
                     // ── Reveal the link connecting to the previous node ──
                     if (index > 0) {
@@ -304,8 +315,8 @@
                         const buildingNode = data.nodes.find(n => n.id === buildingId);
                         if (buildingNode) {
                             pendingTimers.push(setTimeout(() => {
-                                revealNode(nodeGroup, buildingNode, false);
-                                revealSecondaryLink(link, buildingId, node.id);
+                                revealNode(nodeGroup, buildingNode, false, revealedNodeIds);
+                                revealSecondaryLink(link, buildingId, node.id, revealedSecondaryLinkIds);
                             }, REVEAL_FADE_MS * 0.3));
                         }
                     }
@@ -317,13 +328,13 @@
                             const altNodes = data.nodes.filter(n => n.isAlt);
                             altNodes.forEach((alt, ai) => {
                                 pendingTimers.push(setTimeout(() => {
-                                    revealNode(nodeGroup, alt, false);
+                                    revealNode(nodeGroup, alt, false, revealedNodeIds);
                                     // Reveal building link for alt too
                                     const altBldg = oppToBuildingMap[alt.id];
                                     if (altBldg) {
                                         const bNode = data.nodes.find(n => n.id === altBldg);
-                                        if (bNode) revealNode(nodeGroup, bNode, false);
-                                        revealSecondaryLink(link, altBldg, alt.id);
+                                        if (bNode) revealNode(nodeGroup, bNode, false, revealedNodeIds);
+                                        revealSecondaryLink(link, altBldg, alt.id, revealedSecondaryLinkIds);
                                     }
                                 }, ai * 200));
                             });
@@ -333,6 +344,7 @@
                                 isAnimating = false;
                                 nodeGroup.style("pointer-events", "all");
                                 updateVisuals();
+                                postGraphEvent("PATH_REVEAL_COMPLETE");
                             }, altNodes.length * 200 + 300));
                         }, REVEAL_FADE_MS));
                     }
@@ -343,7 +355,9 @@
         }, SETTLE_MS));
     }
 
-    function revealNode(nodeGroup, nodeData, isGold) {
+    function revealNode(nodeGroup, nodeData, isGold, revealedNodeIds) {
+        if (revealedNodeIds?.has(nodeData.id)) return;
+        revealedNodeIds?.add(nodeData.id);
         const sel = nodeGroup.filter(d => d.id === nodeData.id);
 
         // Fade the whole group in
@@ -357,12 +371,12 @@
             .transition()
             .duration(REVEAL_FADE_MS * 0.4)
             .attr("r", function () {
-                return +d3.select(this).attr("r") * 1.5;
+                return +d3.select(this).attr("data-base-r") * 1.5;
             })
             .transition()
             .duration(REVEAL_FADE_MS * 0.6)
             .attr("r", function () {
-                return +d3.select(this).attr("r") / 1.5;
+                return +d3.select(this).attr("data-base-r");
             });
 
         // Gold node gets extra glow burst
@@ -395,7 +409,10 @@
             .style("filter", "url(#glow)");
     }
 
-    function revealSecondaryLink(linkSel, buildingId, oppId) {
+    function revealSecondaryLink(linkSel, buildingId, oppId, revealedSecondaryLinkIds) {
+        const linkKey = [buildingId, oppId].sort().join("::");
+        if (revealedSecondaryLinkIds?.has(linkKey)) return;
+        revealedSecondaryLinkIds?.add(linkKey);
         linkSel
             .filter(l => {
                 const sId = typeof l.source === 'object' ? l.source.id : l.source;
@@ -562,5 +579,11 @@
 
     window.addEventListener("message", handleMessage);
     document.addEventListener("message", handleMessage);
-    populateDefaultGraph();
+
+    const readyMessage = JSON.stringify({ type: "GRAPH_READY" });
+    if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(readyMessage);
+    } else if (window.parent) {
+        window.parent.postMessage(readyMessage, "*");
+    }
 })();

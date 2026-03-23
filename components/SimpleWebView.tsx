@@ -18,18 +18,56 @@ export default function SimpleWebView({
   alternatives = [] 
 }: SimpleWebViewProps) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const internalWebViewRef = React.useRef<WebView | null>(null);
+  const resolvedWebViewRef = webViewRef ?? internalWebViewRef;
+  const isGraphReadyRef = React.useRef(false);
+  const queuedPayloadRef = React.useRef<string | null>(null);
+
+  const rawPayload = React.useMemo(
+    () => JSON.stringify({ type: 'UPDATE_DATA', path: path ?? [], alternatives }),
+    [alternatives, path]
+  );
+
+  const postPayload = React.useCallback((payload: string) => {
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(payload, '*');
+      return;
+    }
+
+    resolvedWebViewRef.current?.postMessage(payload);
+  }, [resolvedWebViewRef]);
+
+  const flushGraphData = React.useCallback(() => {
+    queuedPayloadRef.current = rawPayload;
+    if (!isGraphReadyRef.current) return;
+    postPayload(rawPayload);
+  }, [postPayload, rawPayload]);
 
   React.useEffect(() => {
-    if (path && path.length > 0) {
-      const payload = JSON.stringify({ type: 'UPDATE_DATA', path, alternatives });
-      
-      if (Platform.OS === 'web' && iframeRef.current) {
-        iframeRef.current.contentWindow?.postMessage(payload, '*');
-      } else if (webViewRef?.current) {
-        webViewRef.current.postMessage(payload);
-      }
+    flushGraphData();
+  }, [flushGraphData]);
+
+  const handleGraphMessage = React.useCallback((event: any) => {
+    let parsed: any = null;
+    try {
+      parsed =
+        typeof event?.nativeEvent?.data === 'string'
+          ? JSON.parse(event.nativeEvent.data)
+          : event?.nativeEvent?.data;
+    } catch {
+      parsed = null;
     }
-  }, [path, alternatives, webViewRef]);
+
+    if (parsed?.type === 'GRAPH_READY') {
+      isGraphReadyRef.current = true;
+      if (queuedPayloadRef.current) {
+        postPayload(queuedPayloadRef.current);
+      }
+      return;
+    }
+
+    onMessage?.(event);
+  }, [onMessage, postPayload]);
 
   if (Platform.OS === 'web') {
     const uri = 'uri' in source ? source.uri : undefined;
@@ -38,14 +76,11 @@ export default function SimpleWebView({
     // Listen for messages from iframe
     React.useEffect(() => {
         const handler = (event: MessageEvent) => {
-            if (onMessage) {
-                // Wrap in a format compatible with WebView's onMessage
-                onMessage({ nativeEvent: { data: event.data } });
-            }
+            handleGraphMessage({ nativeEvent: { data: event.data } });
         };
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
-    }, [onMessage]);
+    }, [handleGraphMessage]);
 
     return (
       <View style={styles.container}>
@@ -56,10 +91,7 @@ export default function SimpleWebView({
           style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'transparent' }}
           title="Star Map"
           onLoad={() => {
-            if (path && path.length > 0) {
-                const payload = JSON.stringify({ type: 'UPDATE_DATA', path, alternatives });
-                iframeRef.current?.contentWindow?.postMessage(payload, '*');
-            }
+            isGraphReadyRef.current = false;
           }}
         />
       </View>
@@ -69,9 +101,12 @@ export default function SimpleWebView({
   return (
     <View style={styles.container}>
       <WebView
-        ref={webViewRef}
+        ref={resolvedWebViewRef}
         source={source}
-        onMessage={onMessage}
+        onMessage={handleGraphMessage}
+        onLoadStart={() => {
+          isGraphReadyRef.current = false;
+        }}
         style={styles.webview}
         scrollEnabled={false}
         originWhitelist={['*']}

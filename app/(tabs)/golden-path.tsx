@@ -1,12 +1,15 @@
 import * as React from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
+  Animated,
+  ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  ScrollView,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -27,9 +30,16 @@ export default function GoldenPathScreen() {
   const { showToast } = useToast();
   const { userProfile } = useAuth();
   const { pathData, setPathData, setGlobalGoalText } = useGraph();
+  const { height: windowHeight } = useWindowDimensions();
+  const scrollRef = React.useRef<ScrollView | null>(null);
+  const promptFade = React.useRef(new Animated.Value(1)).current;
+  const milestoneOffsetYRef = React.useRef(0);
   const [alternatives, setAlternatives] = React.useState<PathStep[]>([]);
   const [query, setQuery] = React.useState('');
   const [selectedNodeIds, setSelectedNodeIds] = React.useState<Set<string>>(new Set());
+  const [showSuggestedPrompts, setShowSuggestedPrompts] = React.useState(true);
+  const [isGeneratingPath, setIsGeneratingPath] = React.useState(false);
+  const graphHeight = Math.max(640, windowHeight - 110);
 
   // Initialize all nodes as selected when path changes
   React.useEffect(() => {
@@ -39,7 +49,7 @@ export default function GoldenPathScreen() {
     }
   }, [pathData]);
 
-  const onGraphMessage = (event: any) => {
+  const onGraphMessage = React.useCallback((event: any) => {
     try {
       const data = typeof event.nativeEvent.data === 'string' 
         ? JSON.parse(event.nativeEvent.data) 
@@ -57,7 +67,22 @@ export default function GoldenPathScreen() {
     } catch (e) {
       console.error('Error parsing graph message', e);
     }
-  };
+  }, [selectedNodeIds]);
+
+  const hideSuggestedPrompts = React.useCallback(() => {
+    if (!showSuggestedPrompts) return;
+
+    Animated.timing(promptFade, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setShowSuggestedPrompts(false);
+      }
+    });
+  }, [promptFade, showSuggestedPrompts]);
+
   const submitPrompt = React.useCallback(async () => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
@@ -66,6 +91,10 @@ export default function GoldenPathScreen() {
     }
 
     try {
+      setIsGeneratingPath(true);
+      setQuery('');
+      hideSuggestedPrompts();
+
       // For now, we'll use the first goal of the user or 'career' as default
       const goalType = (userProfile?.goals[0] as GoalType) || 'career';
       const response = await fetchPathfind({ 
@@ -88,8 +117,11 @@ export default function GoldenPathScreen() {
       } else {
         showToast('Failed to generate path. Please try again.', 'error');
       }
+      setQuery(trimmedQuery);
+    } finally {
+      setIsGeneratingPath(false);
     }
-  }, [query, showToast, userProfile, setPathData, setGlobalGoalText]);
+  }, [query, showToast, userProfile, setPathData, setGlobalGoalText, hideSuggestedPrompts]);
 
   const isGenericSkill = (skill: string) => {
     const generic = ['professional', 'networking', 'career', 'teamwork', 'leadership', 'communication', 'interpersonal', 'soft skills'];
@@ -106,53 +138,23 @@ export default function GoldenPathScreen() {
     });
   }, [pathData]);
 
+  const hasMilestones = uniquePathData.length > 0 || alternatives.length > 0;
+
+  React.useEffect(() => {
+    setShowSuggestedPrompts(true);
+    promptFade.setValue(1);
+  }, [promptFade]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Connection Graph</Text>
-          <Text style={styles.subtitle}>
-            Explore how skills, professors, clubs, and opportunities connect.
-          </Text>
-        </View>
-
-        <View style={styles.searchSection}>
-          <View style={styles.searchShell}>
-            <MaterialIcons
-              name="auto-awesome"
-              size={18}
-              color={theme.colors.textMuted}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Ask about careers, clubs, or skills..."
-              placeholderTextColor={theme.colors.textMuted}
-              style={styles.searchInput}
-              returnKeyType="send"
-              onSubmitEditing={submitPrompt}
-            />
-            <Pressable onPress={submitPrompt} style={styles.submitButton}>
-              <MaterialIcons
-                name="south-east"
-                size={22}
-                color={theme.colors.backgroundPrimary}
-              />
-            </Pressable>
-          </View>
-
-          <View style={styles.promptRow}>
-            {SUGGESTED_PROMPTS.map((prompt) => (
-              <Pressable key={prompt} onPress={() => setQuery(prompt)} style={styles.promptChip}>
-                <Text style={styles.promptChipText}>{prompt}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
-          <View style={styles.canvasArea}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.graphStage, { height: graphHeight }]}>
+          <View style={styles.graphSurface}>
             <SimpleWebView 
               source={{ uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/assets/graph/index.html` }}
               path={pathData}
@@ -161,53 +163,132 @@ export default function GoldenPathScreen() {
             />
           </View>
 
-          {(uniquePathData.length > 0 || alternatives.length > 0) && (
-            <View style={styles.milestoneSection}>
-              <Text style={styles.milestoneTitle}>Your Journey Milestones</Text>
-              {(() => {
-                const combined = [...uniquePathData, ...alternatives];
-                const seenIds = new Set();
-                return combined
-                  .filter((step) => {
-                    const oId = step.opportunity_id || step.opportunity_title;
-                    if (seenIds.has(oId)) return false;
-                    const oppId = `opp:${oId}`;
-                    const altId = `alt:${oId}`;
-                    const isSelected = selectedNodeIds.has(oppId) || selectedNodeIds.has(altId);
-                    if (isSelected) {
-                      seenIds.add(oId);
-                      return true;
+          <View pointerEvents="box-none" style={styles.overlayLayer}>
+            <View style={styles.topOverlay}>
+              <View style={styles.header}>
+                <View style={styles.headerCopy}>
+                  <Text style={styles.title}>Connection Graph</Text>
+                  <Text style={styles.subtitle}>
+                    Explore how skills, professors, clubs, and opportunities connect.
+                  </Text>
+                </View>
+                {hasMilestones ? (
+                  <Pressable
+                    style={styles.journeyButton}
+                    onPress={() =>
+                      scrollRef.current?.scrollTo({
+                        y: Math.max(milestoneOffsetYRef.current - 16, 0),
+                        animated: true,
+                      })
                     }
-                    return false;
-                  })
-                  .sort((a, b) => (a.order || 0) - (b.order || 0))
-                  .map((step, idx) => (
-                    <View key={`${step.opportunity_id}-${idx}`} style={styles.milestoneCard}>
-                      <View style={styles.milestoneHeader}>
-                        <View style={styles.milestoneBadge}>
-                          <Text style={styles.milestoneBadgeText}>{idx + 1}</Text>
-                        </View>
-                        <View style={styles.milestoneHeaderText}>
-                          <Text style={styles.milestoneBuilding}>{step.building_name}</Text>
-                          <Text style={styles.milestoneOpp}>{step.opportunity_title}</Text>
-                        </View>
+                  >
+                    <MaterialIcons name="timeline" size={20} color={theme.colors.textPrimary} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <View style={styles.searchSection}>
+                <View style={styles.searchShell}>
+                  <MaterialIcons
+                    name="auto-awesome"
+                    size={18}
+                    color={theme.colors.textMuted}
+                    style={styles.searchIcon}
+                  />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Ask about careers, clubs, or skills..."
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={styles.searchInput}
+                    returnKeyType="send"
+                    onSubmitEditing={submitPrompt}
+                    editable={!isGeneratingPath}
+                  />
+                  <Pressable onPress={submitPrompt} style={styles.submitButton} disabled={isGeneratingPath}>
+                    {isGeneratingPath ? (
+                      <ActivityIndicator size="small" color={theme.colors.backgroundPrimary} />
+                    ) : (
+                      <MaterialIcons
+                        name="south-east"
+                        size={22}
+                        color={theme.colors.backgroundPrimary}
+                      />
+                    )}
+                  </Pressable>
+                </View>
+
+                {showSuggestedPrompts ? (
+                  <Animated.View style={[styles.promptRow, { opacity: promptFade }]}>
+                    {SUGGESTED_PROMPTS.map((prompt) => (
+                      <Pressable
+                        key={prompt}
+                        onPress={() => {
+                          setQuery(prompt);
+                          hideSuggestedPrompts();
+                        }}
+                        style={styles.promptChip}
+                      >
+                        <Text style={styles.promptChipText}>{prompt}</Text>
+                      </Pressable>
+                    ))}
+                  </Animated.View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {hasMilestones && (
+          <View
+            style={styles.milestoneSection}
+            onLayout={(event) => {
+              milestoneOffsetYRef.current = event.nativeEvent.layout.y;
+            }}
+          >
+            <Text style={styles.milestoneTitle}>Your Journey Milestones</Text>
+            {(() => {
+              const combined = [...uniquePathData, ...alternatives];
+              const seenIds = new Set();
+              return combined
+                .filter((step) => {
+                  const oId = step.opportunity_id || step.opportunity_title;
+                  if (seenIds.has(oId)) return false;
+                  const oppId = `opp:${oId}`;
+                  const altId = `alt:${oId}`;
+                  const isSelected = selectedNodeIds.has(oppId) || selectedNodeIds.has(altId);
+                  if (isSelected) {
+                    seenIds.add(oId);
+                    return true;
+                  }
+                  return false;
+                })
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((step, idx) => (
+                  <View key={`${step.opportunity_id}-${idx}`} style={styles.milestoneCard}>
+                    <View style={styles.milestoneHeader}>
+                      <View style={styles.milestoneBadge}>
+                        <Text style={styles.milestoneBadgeText}>{idx + 1}</Text>
                       </View>
-                      <Text style={styles.milestoneReason}>{step.short_reason}</Text>
-                      <View style={styles.skillBadgeRow}>
-                        {step.skills.filter((s: string) => !isGenericSkill(s)).map((s: string) => (
-                          <View key={s} style={styles.skillBadge}>
-                            <Text style={styles.skillBadgeText}>{s}</Text>
-                          </View>
-                        ))}
+                      <View style={styles.milestoneHeaderText}>
+                        <Text style={styles.milestoneBuilding}>{step.building_name}</Text>
+                        <Text style={styles.milestoneOpp}>{step.opportunity_title}</Text>
                       </View>
                     </View>
-                  ));
-              })()}
-            </View>
-          )}
-        </ScrollView>
-
-      </View>
+                    <Text style={styles.milestoneReason}>{step.short_reason}</Text>
+                    <View style={styles.skillBadgeRow}>
+                      {step.skills.filter((s: string) => !isGenericSkill(s)).map((s: string) => (
+                        <View key={s} style={styles.skillBadge}>
+                          <Text style={styles.skillBadgeText}>{s}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ));
+            })()}
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -220,12 +301,34 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.backgroundPrimary,
+  },
+  screenContent: {
+    paddingBottom: 50,
+  },
+  graphStage: {
+    position: 'relative',
+    backgroundColor: theme.colors.backgroundPrimary,
+  },
+  graphSurface: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0f172a',
+  },
+  overlayLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  topOverlay: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 20,
   },
   header: {
-    marginBottom: 28,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  headerCopy: {
+    flex: 1,
+    paddingRight: 12,
   },
   title: {
     fontSize: 30,
@@ -240,16 +343,27 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     maxWidth: 320,
   },
+  journeyButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    ...shadows.card,
+  },
   searchSection: {
-    marginBottom: 18,
+    gap: 14,
   },
   searchShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
     minHeight: 66,
     paddingLeft: 16,
     paddingRight: 10,
@@ -276,13 +390,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 14,
   },
   promptChip: {
-    backgroundColor: theme.colors.surfaceMuted,
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -291,22 +404,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  scrollArea: {
-    flex: 1,
-  },
-  canvasArea: {
-    height: 450,
-    width: '100%',
-    backgroundColor: '#0f172a',
-    borderRadius: 24,
-    marginBottom: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-  },
   milestoneSection: {
-    marginTop: 10,
-    paddingBottom: 40,
+    marginHorizontal: 16,
+    marginTop: 18,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.18)',
+    ...shadows.card,
   },
   milestoneTitle: {
     color: theme.colors.textPrimary,

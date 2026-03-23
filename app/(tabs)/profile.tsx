@@ -143,11 +143,11 @@ export default function ProfileScreen() {
       {
         id: 'interests',
         label: 'Active Interests',
-        value: String(derivedInterests.length),
-        icon: 'favorite-border' as const,
+        value: String(opportunities.length),
+        icon: 'bookmark' as const,
       },
     ],
-    [derivedInterests.length, derivedSkills.length]
+    [derivedSkills.length, opportunities.length]
   );
 
   const graphSize = derivedSkills.length + derivedInterests.length + opportunities.length;
