@@ -10,7 +10,6 @@ NEW_PHYSICS_EVENTS = [
         "location_detail": "Room 2165, New Physics Building (NPB)",
         "tags": ["High Energy Physics", "Seminar", "Particle Physics", "Cosmology"],
         "contact": "UF Department of Physics",
-        "pay": "Free",
         "goal_tags": ["research", "career"],
     },
     {
@@ -24,7 +23,6 @@ NEW_PHYSICS_EVENTS = [
         "location_detail": "NPB 1002, New Physics Building",
         "tags": ["Physics", "Colloquium", "Research", "Invited Speaker"],
         "contact": "UF Department of Physics",
-        "pay": "Free",
         "goal_tags": ["research", "career"],
     },
     {
@@ -38,7 +36,6 @@ NEW_PHYSICS_EVENTS = [
         "location_detail": "New Physics Building",
         "tags": ["Condensed Matter", "Biophysics", "Seminar", "Research"],
         "contact": "UF Department of Physics",
-        "pay": "Free",
         "goal_tags": ["research", "career"],
     },
 ]

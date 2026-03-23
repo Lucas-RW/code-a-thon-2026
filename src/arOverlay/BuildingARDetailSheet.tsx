@@ -27,7 +27,15 @@ import Animated, {
 import type { ARBuilding } from './types';
 import { themeColorForBuildingType } from './utils';
 import { shadows, theme } from '@/lib/theme';
-import { fetchBuilding, fetchBuildingOpportunities, Opportunity } from '@/lib/api';
+import {
+  fetchBuilding,
+  fetchBuildingOpportunities,
+  fetchInterestedOpportunities,
+  Opportunity,
+  setOpportunityInterest,
+} from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 interface BuildingARDetailSheetProps {
   building: ARBuilding;
@@ -63,6 +71,8 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export default function BuildingARDetailSheet({ building, onClose }: BuildingARDetailSheetProps) {
+  const { accessToken } = useAuth();
+  const { showToast } = useToast();
   const translateY = useSharedValue(900);
   const [activeTab, setActiveTab] = useState<TabKey>('description');
   const [interestedMap, setInterestedMap] = useState<Record<string, boolean>>({});
@@ -93,14 +103,22 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     async function loadBuildingData() {
       setIsLoadingData(true);
       try {
-        const [detail, opportunities] = await Promise.all([
+        const [detail, opportunities, interested] = await Promise.all([
           fetchBuilding(building.id),
           fetchBuildingOpportunities(building.id),
+          accessToken ? fetchInterestedOpportunities().catch(() => []) : Promise.resolve([]),
         ]);
 
         if (!cancelled) {
           setBuildingDetail(detail);
           setBuildingOpportunities(opportunities);
+          const interestedIds = new Set(interested.map((item) => item.id));
+          setInterestedMap(
+            opportunities.reduce<Record<string, boolean>>((acc, opportunity) => {
+              acc[opportunity.id] = interestedIds.has(opportunity.id);
+              return acc;
+            }, {})
+          );
         }
       } finally {
         if (!cancelled) {
@@ -114,7 +132,7 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     return () => {
       cancelled = true;
     };
-  }, [building.id]);
+  }, [accessToken, building.id]);
 
   const closeSheet = React.useCallback(() => {
     translateY.value = withTiming(900, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
@@ -146,8 +164,24 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     opacity: interpolate(translateY.value, [0, 500], [1, 0], Extrapolation.CLAMP),
   }));
 
-  const toggleInterested = (id: string) => {
-    setInterestedMap((current) => ({ ...current, [id]: !current[id] }));
+  const toggleInterested = async (id: string) => {
+    if (!accessToken) {
+      showToast('Log in to save opportunities.', 'error');
+      return;
+    }
+
+    const previous = !!interestedMap[id];
+    const next = !previous;
+    setInterestedMap((current) => ({ ...current, [id]: next }));
+
+    try {
+      await setOpportunityInterest(id, next);
+      showToast(next ? 'Added to interests.' : 'Removed from interests.', next ? 'success' : 'info');
+    } catch (error) {
+      setInterestedMap((current) => ({ ...current, [id]: previous }));
+      const message = error instanceof Error ? error.message : 'Failed to update interest';
+      showToast(message, 'error');
+    }
   };
 
   const toggleExpanded = (id: string) => {

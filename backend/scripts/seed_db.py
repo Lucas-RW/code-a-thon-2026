@@ -24,8 +24,8 @@ async def main():
         {
             "name": "Malachowsky Hall",
             "short_name": "MAL",
-            "lat": 28.348565,
-            "lng": -81.237858,
+            "lat": 29.647921,
+            "lng": -82.343946,
             "departments": [
                 "Computer & Information Science & Engineering",
                 "Electrical & Computer Engineering",
@@ -49,7 +49,7 @@ async def main():
             "lng": -82.3478,
             "departments": ["Student Affairs", "Campus Programs", "Student Organizations"],
             "description": "The central hub of student life, events, and community programming, used as a placeholder building for student-life recommendations in the AR experience.",
-            "image_url": "https://placehold.co/1200x700/111827/F8FAFC?text=Reitz+Union",
+            "image_url": "https://walker-arch.com/wp-content/uploads/2018/01/reitz_front-elevation.jpg",
             "professors": [
                 {
                     "id": "reitz-p1",

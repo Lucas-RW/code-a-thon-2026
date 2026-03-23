@@ -3,7 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Ima
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity, GoalType } from '@/lib/api';
+import {
+  fetchBuildings,
+  fetchBuildingOpportunities,
+  fetchInterestedOpportunities,
+  BuildingSummary,
+  InterestedOpportunity,
+  GoalType,
+  Opportunity,
+} from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
@@ -16,6 +24,7 @@ type FeedItem = {
   title: string;
   subtitle: string;
   meta: string;
+  opportunityId: string;
   buildingId: string;
   buildingShortName?: string;
 };
@@ -75,8 +84,13 @@ export default function HomeScreen() {
   const { userProfile } = useAuth();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [interests, setInterests] = React.useState<InterestedOpportunity[]>([]);
+  const [allOpportunities, setAllOpportunities] = React.useState<(Opportunity & {
+    building_name: string;
+    building_short_name?: string;
+  })[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [selectedBuilding, setSelectedBuilding] = React.useState<ARBuilding | null>(null);
+  const [showAllActivity, setShowAllActivity] = React.useState(false);
 
   const loadHome = React.useCallback(async () => {
     setIsLoading(true);
@@ -85,8 +99,19 @@ export default function HomeScreen() {
         fetchBuildings(),
         fetchInterestedOpportunities().catch(() => [] as InterestedOpportunity[]),
       ]);
+      const opportunityGroups = await Promise.all(
+        buildingData.map(async (building) => {
+          const buildingOpportunities = await fetchBuildingOpportunities(building.id);
+          return buildingOpportunities.map((opportunity) => ({
+            ...opportunity,
+            building_name: building.name,
+            building_short_name: building.short_name,
+          }));
+        })
+      );
       setBuildings(buildingData);
       setInterests(interestData);
+      setAllOpportunities(opportunityGroups.flat());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       showToast(msg, 'error');
@@ -124,7 +149,7 @@ export default function HomeScreen() {
     return counts;
   }, [interests]);
 
-  const recentActivity = React.useMemo<ActivityItem[]>(() => {
+  const activityHistory = React.useMemo<ActivityItem[]>(() => {
     const timeline: ActivityItem[] = [];
 
     if (userProfile?.major) {
@@ -155,7 +180,7 @@ export default function HomeScreen() {
     });
 
     if (timeline.length > 0) {
-      return timeline.slice(0, 5);
+      return timeline;
     }
 
     return [
@@ -168,45 +193,32 @@ export default function HomeScreen() {
     ];
   }, [interests, userProfile]);
 
+  const visibleActivity = React.useMemo(
+    () => (showAllActivity ? activityHistory : activityHistory.slice(0, 5)),
+    [activityHistory, showAllActivity]
+  );
+
   const feedItems = React.useMemo<FeedItem[]>(() => {
-    const items = interests.slice(0, 5).map((item) => ({
+    if (allOpportunities.length === 0) {
+      return [];
+    }
+
+    const shuffled = [...allOpportunities];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return shuffled.slice(0, 3).map((item) => ({
       id: item.id,
+      opportunityId: item.id,
       title: item.title,
-      subtitle:
-        item.type === 'research'
-          ? 'A professor in your orbit has a research opening.'
-          : item.type === 'event'
-            ? 'A campus event connected to your interests is coming up.'
-            : 'A new opportunity matches the direction of your graph.',
+      subtitle: item.summary || item.description || 'Explore this opportunity and see how it fits your path.',
       meta: item.building_name,
       buildingId: item.building_id,
       buildingShortName: item.building_short_name,
     }));
-
-    if (items.length > 0) {
-      return items;
-    }
-
-    return buildings.slice(0, 3).map((building, index) => ({
-      id: building.id,
-      title: `${building.name} has new pathways to explore`,
-      subtitle: 'Jump back into a relevant location and see what opportunities are nearby.',
-      meta: index === 0 ? 'Suggested next move' : 'Recommended building',
-      buildingId: building.id,
-      buildingShortName: building.short_name,
-    }));
-  }, [buildings, interests]);
-
-  const openBuilding = (building: BuildingSummary | { id: string; name?: string; short_name?: string }) => {
-    router.push({
-      pathname: '/building/[id]',
-      params: {
-        id: building.id,
-        name: building.name ?? 'Building',
-        short_name: building.short_name || '',
-      },
-    });
-  };
+  }, [allOpportunities]);
 
   if (isLoading && buildings.length === 0) {
     return <LoadingState message="Loading your command center..." />;
@@ -261,11 +273,17 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Activity History</Text>
-          <Text style={styles.sectionHint}>Your momentum</Text>
+          {activityHistory.length > 5 ? (
+            <TouchableOpacity onPress={() => setShowAllActivity((current) => !current)}>
+              <Text style={styles.sectionAction}>{showAllActivity ? 'Show less' : 'Show all'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.sectionHint}>Your momentum</Text>
+          )}
         </View>
         <View style={styles.activityHistoryCard}>
-          {recentActivity.map((item, index) => (
-            <View key={item.id} style={[styles.timelineRow, index === recentActivity.length - 1 && styles.timelineRowLast]}>
+          {visibleActivity.map((item, index) => (
+            <View key={item.id} style={[styles.timelineRow, index === visibleActivity.length - 1 && styles.timelineRowLast]}>
               <View style={styles.timelineIcon}>
                 <MaterialIcons name={item.icon} size={16} color={theme.colors.accentTertiary} />
               </View>
@@ -300,42 +318,26 @@ export default function HomeScreen() {
               {featuredOpportunity?.building_name || personalizedBuildings[0]?.name || 'Campus-wide'}
             </Text>
           </View>
-          <View style={styles.heroActions}>
-            <TouchableOpacity
-              style={styles.heroPrimaryButton}
-              onPress={() =>
-                featuredOpportunity
-                  ? openBuilding({
-                      id: featuredOpportunity.building_id,
-                      name: featuredOpportunity.building_name,
-                      short_name: featuredOpportunity.building_short_name,
-                    })
-                  : personalizedBuildings[0] && openBuilding(personalizedBuildings[0])
-              }
-            >
-              <Text style={styles.heroPrimaryText}>View</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroSecondaryButton} onPress={() => router.push('/my-opportunities')}>
-              <Text style={styles.heroSecondaryText}>Interested</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.learnMoreButton}
+            onPress={() =>
+              featuredOpportunity
+                ? router.push({
+                    pathname: '/my-opportunities',
+                    params: { opportunityId: featuredOpportunity.id },
+                  })
+                : router.push('/my-opportunities')
+            }
+          >
+            <Text style={styles.learnMoreText}>Learn more</Text>
+          </TouchableOpacity>
         </LinearGradient>
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>From Your Network</Text>
         </View>
         {feedItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.feedCard}
-            onPress={() =>
-              openBuilding({
-                id: item.buildingId,
-                name: item.meta,
-                short_name: item.buildingShortName,
-              })
-            }
-          >
+          <View key={item.id} style={styles.feedCard}>
             <View style={styles.feedIcon}>
               <MaterialIcons name="hub" size={18} color={theme.colors.accentTertiary} />
             </View>
@@ -344,16 +346,18 @@ export default function HomeScreen() {
               <Text style={styles.feedSubtitle}>{item.subtitle}</Text>
               <Text style={styles.feedMeta}>{item.meta}</Text>
             </View>
-            <TouchableOpacity 
-              onPress={() => {
-                const b = buildings.find(b => b.id === item.buildingId);
-                if (b) setSelectedBuilding(toARBuilding(b, opportunityCountByBuilding.get(b.id) ?? 0));
-              }}
-              style={styles.voyagerTrigger}
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/my-opportunities',
+                  params: { opportunityId: item.opportunityId },
+                })
+              }
+              style={styles.feedArrowTrigger}
             >
-              <MaterialIcons name="auto-fix-high" size={20} color={theme.colors.accentTertiary} />
+              <MaterialIcons name="arrow-forward-ios" size={16} color={theme.colors.accentTertiary} />
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
 
@@ -421,6 +425,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  sectionAction: {
+    color: theme.colors.accentTertiary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   buildingRail: {
     paddingBottom: 10,
@@ -516,6 +525,7 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 26,
     padding: 22,
+    paddingBottom: 18,
     marginBottom: 28,
     ...shadows.glow,
   },
@@ -557,33 +567,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  heroActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  heroPrimaryButton: {
-    backgroundColor: theme.colors.textOnAccent,
-    borderRadius: 14,
+  learnMoreButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
     paddingHorizontal: 18,
     paddingVertical: 12,
-  },
-  heroPrimaryText: {
-    color: theme.colors.backgroundPrimary,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  heroSecondaryButton: {
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.26)',
   },
-  heroSecondaryText: {
+  learnMoreText: {
     color: theme.colors.textOnAccent,
-    fontWeight: '700',
     fontSize: 14,
+    fontWeight: '700',
   },
   feedCard: {
     flexDirection: 'row',
@@ -628,7 +625,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  voyagerTrigger: {
+  feedArrowTrigger: {
     width: 40,
     height: 40,
     borderRadius: 20,

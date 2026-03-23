@@ -338,7 +338,8 @@ async def get_interested_opportunities(current_user: dict = Depends(get_current_
             "tags": s_opp.get("tags", []),
             "contact": s_opp.get("contact", None),
             "url": s_opp.get("url", None),
-            "deadline": s_opp.get("deadline", None)
+            "deadline": s_opp.get("deadline", None),
+            "goal_tags": s_opp.get("goal_tags", []),
         })
         
     logger.info(f"Returned {len(results)} interested opportunities for user {current_user['id']}")

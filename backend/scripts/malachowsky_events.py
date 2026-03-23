@@ -10,7 +10,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "Association for Computing Machinery (ACM) at UF",
         "deadline": "Every Friday during the semester",
         "hourly_commitment": "1:00 PM - 3:00 PM",
-        "pay": "Free",
         "goal_tags": ["social_support", "career"],
     },
     {
@@ -24,7 +23,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "UF CISE Department",
         "deadline": "March 11, 2026",
         "hourly_commitment": "4:00 PM - 6:00 PM",
-        "pay": "Free",
         "goal_tags": ["research", "career"],
     },
     {
@@ -38,7 +36,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "UF Career Connections Center",
         "deadline": "March 18, 2026",
         "hourly_commitment": "11:00 AM - 1:00 PM",
-        "pay": "Free",
         "goal_tags": ["career"],
     },
     {
@@ -52,7 +49,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "UF Biomedical AI Collaborative",
         "deadline": "March 24, 2026",
         "hourly_commitment": "3:30 PM - 5:00 PM",
-        "pay": "Free",
         "goal_tags": ["research", "career"],
     },
     {
@@ -66,7 +62,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "Florida Institute for Cybersecurity Research (FICS)",
         "deadline": "April 2, 2026",
         "hourly_commitment": "6:00 PM - 8:30 PM",
-        "pay": "Free",
         "goal_tags": ["career", "research"],
     },
     {
@@ -80,7 +75,6 @@ MALACHOWSKY_EVENTS = [
         "contact": "UF Semiconductor Career Readiness Organization (SCRO)",
         "deadline": "April 8, 2026",
         "hourly_commitment": "5:30 PM - 7:30 PM",
-        "pay": "Free",
         "goal_tags": ["career"],
     },
 ]
