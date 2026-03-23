@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { View, StyleSheet, Dimensions, Text, Platform } from 'react-native';
 import Svg, { Circle, Line, G, Text as SvgText, Defs, RadialGradient, Stop } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
-const TREE_SIZE = 300;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TREE_SIZE = Math.min(SCREEN_WIDTH - 80, 380);
 const CENTER = TREE_SIZE / 2;
 
 interface SkillTreeProps {
@@ -30,8 +30,8 @@ export default function SkillTree({
         // Center node
         result.push({ id: 'center', label: 'ME', status: 'acquired', x: CENTER, y: CENTER });
 
-        // Orbit 1: Acquired Skills
-        const orbit1Radius = 50;
+        // Orbit 1: Acquired Skills — spread wide
+        const orbit1Radius = 80;
         uniqueAcquired.forEach((skill, i) => {
             const angle = (i / (uniqueAcquired.length || 1)) * 2 * Math.PI;
             result.push({
@@ -45,9 +45,9 @@ export default function SkillTree({
 
         // Orbit 2: Planned Skills (Only if not acquiredOnly)
         if (!acquiredOnly && uniquePlanned.length > 0) {
-            const orbit2Radius = 100;
+            const orbit2Radius = 150;
             uniquePlanned.forEach((skill, i) => {
-                const angle = (i / (uniquePlanned.length || 1)) * 2 * Math.PI + 0.6; // Shift for variety
+                const angle = (i / (uniquePlanned.length || 1)) * 2 * Math.PI + 0.6;
                 result.push({
                     id: `p-${i}`,
                     label: skill,
@@ -84,7 +84,7 @@ export default function SkillTree({
     return (
         <View style={styles.container}>
             <View style={styles.svgWrapper}>
-                <Svg width={TREE_SIZE} height={TREE_SIZE} viewBox={`0 0 ${TREE_SIZE} ${TREE_SIZE}`}>
+                <Svg width="100%" height="100%" viewBox={`0 0 ${TREE_SIZE} ${TREE_SIZE}`}>
                     <Defs>
                         <RadialGradient id="glow" cx="50%" cy="50%" rx="50%" ry="50%">
                             <Stop offset="0%" stopColor="#FFD700" stopOpacity="0.4" />
@@ -93,9 +93,9 @@ export default function SkillTree({
                     </Defs>
 
                     {/* Orbits */}
-                    <Circle cx={CENTER} cy={CENTER} r={50} stroke="#333" strokeWidth="1" fill="none" strokeDasharray="5,5" />
+                    <Circle cx={CENTER} cy={CENTER} r={80} stroke="#333" strokeWidth="1" fill="none" strokeDasharray="5,5" />
                     {!acquiredOnly && (
-                        <Circle cx={CENTER} cy={CENTER} r={100} stroke="#222" strokeWidth="1" fill="none" strokeDasharray="3,3" />
+                        <Circle cx={CENTER} cy={CENTER} r={150} stroke="#222" strokeWidth="1" fill="none" strokeDasharray="3,3" />
                     )}
 
                     {/* Edges */}
@@ -107,7 +107,7 @@ export default function SkillTree({
                             x2={edge.x2}
                             y2={edge.y2}
                             stroke={edge.status === 'acquired' ? '#FFD700' : '#444'}
-                            strokeWidth={selectedNodeId === edge.targetId ? 2 : (edge.status === 'acquired' ? 1.5 : 1)}
+                            strokeWidth={selectedNodeId === edge.targetId ? 3 : (edge.status === 'acquired' ? 2 : 1)}
                             opacity={selectedNodeId === edge.targetId ? 1 : (edge.status === 'acquired' ? 0.6 : 0.3)}
                         />
                     ))}
@@ -116,22 +116,22 @@ export default function SkillTree({
                     {nodes.map((node) => (
                         <G key={node.id}>
                             {node.status === 'acquired' && (
-                                <Circle cx={node.x} cy={node.y} r={12} fill="url(#glow)" />
+                                <Circle cx={node.x} cy={node.y} r={18} fill="url(#glow)" />
                             )}
                             <Circle
                                 cx={node.x}
                                 cy={node.y}
-                                r={node.id === 'center' ? 6 : (selectedNodeId === node.id ? 7 : 4)}
+                                r={node.id === 'center' ? 12 : (selectedNodeId === node.id ? 10 : 8)}
                                 fill={node.status === 'acquired' ? '#FFD700' : '#333'}
                                 stroke={selectedNodeId === node.id ? 'white' : (node.status === 'acquired' ? 'white' : '#666')}
-                                strokeWidth={selectedNodeId === node.id ? 2 : (node.status === 'acquired' ? 1 : 0.5)}
+                                strokeWidth={selectedNodeId === node.id ? 2.5 : (node.status === 'acquired' ? 1.5 : 0.5)}
                                 onPress={() => setSelectedNodeId(node.id === selectedNodeId ? null : node.id)}
                             />
                             <SvgText
                                 x={node.x}
-                                y={node.y + 16}
+                                y={node.y + 22}
                                 fill={selectedNodeId === node.id ? 'white' : (node.status === 'acquired' ? 'white' : '#888')}
-                                fontSize={node.id === 'center' ? 10 : 9}
+                                fontSize={node.id === 'center' ? 14 : 13}
                                 fontWeight={node.status === 'acquired' ? 'bold' : 'normal'}
                                 textAnchor="middle"
                                 pointerEvents="none"
@@ -159,12 +159,12 @@ const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
         justifyContent: 'center',
-        width: TREE_SIZE,
-        height: TREE_SIZE + 40, // Extra for tooltip
+        width: '100%',
+        aspectRatio: 1,
     },
     svgWrapper: {
-        width: TREE_SIZE,
-        height: TREE_SIZE,
+        width: '100%',
+        aspectRatio: 1,
     },
     tooltip: {
         backgroundColor: 'rgba(255,255,255,0.95)',
@@ -188,12 +188,12 @@ const styles = StyleSheet.create({
     },
     tooltipTitle: {
         color: '#050505',
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '900',
     },
     tooltipStatus: {
         color: '#666',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         marginTop: 2,
     },

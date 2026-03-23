@@ -1,7 +1,7 @@
-import * as React from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as React from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   graphPlaceholder: {
-    height: 124,
+    height: 180,
     borderRadius: 20,
     backgroundColor: 'transparent',
     marginBottom: 14,
