@@ -361,6 +361,16 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
     RELEVANCE_THRESHOLD = 60   # minimum score to appear as an alternative
     MAX_ALTERNATIVES = 8       # cap on alt nodes in the graph
     
+    # Stop words to exclude from keyword search
+    STOP_WORDS = {
+        "i", "me", "my", "we", "a", "an", "the", "to", "of", "in", "for",
+        "is", "am", "are", "be", "do", "it", "at", "on", "by", "as", "or",
+        "so", "if", "up", "no", "not", "and", "but", "how", "what", "when",
+        "want", "wanting", "become", "becoming", "get", "getting", "into",
+        "like", "would", "being", "with", "about", "have", "some", "more",
+        "really", "just", "also", "that", "this", "from", "will", "can",
+    }
+    
     try:
         user_id = current_user["id"]
         goal = payload.goal_type
@@ -369,16 +379,25 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
         opps_collection = database.get_collection("opportunities")
         bldgs_collection = database.get_collection("buildings")
         
-        # ── 1. Broad candidate search (same as before) ──
-        keywords = [re.escape(k) for k in (goal_text or goal).split() if len(k) > 1]
+        # ── 1. Smart candidate search with stop-word filtering ──
+        raw_words = [w for w in (goal_text or goal).split() if len(w) > 1]
+        keywords = [re.escape(k) for k in raw_words if k.lower() not in STOP_WORDS]
+        
+        # If all words were stop words, use the full goal text as a phrase
         if not keywords:
             keywords = [re.escape(goal_text or goal)]
         
+        # Also try matching the full meaningful phrase (e.g. "software engineer")
+        meaningful_phrase = " ".join(k for k in raw_words if k.lower() not in STOP_WORDS)
+        phrase_patterns = [meaningful_phrase] if len(meaningful_phrase) > 3 else []
+        
+        all_regex_patterns = list(set(keywords + [re.escape(p) for p in phrase_patterns]))
+        
         search_filter = {
             "$or": [
-                {"title": {"$regex": "|".join(keywords), "$options": "i"}},
-                {"description": {"$regex": "|".join(keywords), "$options": "i"}},
-                {"tags": {"$in": [re.compile(k, re.I) for k in keywords]}}
+                {"title": {"$regex": "|".join(all_regex_patterns), "$options": "i"}},
+                {"description": {"$regex": "|".join(all_regex_patterns), "$options": "i"}},
+                {"tags": {"$in": [re.compile(k, re.I) for k in all_regex_patterns]}}
             ]
         }
         
@@ -387,7 +406,7 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
         async for doc in cursor:
             all_candidates.append(serialize_mongo_document(doc))
             
-        # Breadth expansion via tags of found results
+        # Breadth expansion via tags of found results (only SWE-relevant tags)
         if all_candidates and len(all_candidates) < 15:
             found_tags = set()
             for cand in all_candidates:
@@ -409,7 +428,8 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
             async for doc in cursor:
                 all_candidates.append(serialize_mongo_document(doc))
         
-        # Goal-type expansion
+        # Goal-type expansion — but cross-filter with keywords so irrelevant
+        # career items (finance, marketing) don't dilute specific goals (SWE)
         if len(all_candidates) < 15:
             existing_ids = []
             for c in all_candidates:
@@ -419,15 +439,28 @@ async def pathfind(payload: PathfindRequest, current_user: dict = Depends(get_cu
                     pass
                 existing_ids.append(c["id"])
             
-            goal_filter = {
-                "goal_tags": goal,
-                "_id": {"$nin": existing_ids}
-            }
+            # If we have meaningful keywords, require goal_tags match AND
+            # at least some keyword overlap in title/desc/tags
+            if keywords and len(keywords) > 0:
+                goal_filter = {
+                    "goal_tags": goal,
+                    "_id": {"$nin": existing_ids},
+                    "$or": [
+                        {"title": {"$regex": "|".join(keywords), "$options": "i"}},
+                        {"description": {"$regex": "|".join(keywords), "$options": "i"}},
+                        {"tags": {"$in": [re.compile(k, re.I) for k in keywords]}}
+                    ]
+                }
+            else:
+                goal_filter = {
+                    "goal_tags": goal,
+                    "_id": {"$nin": existing_ids}
+                }
             cursor = opps_collection.find(goal_filter).limit(20 - len(all_candidates))
             async for doc in cursor:
                 all_candidates.append(serialize_mongo_document(doc))
 
-        # Fallback to goal_tags if still empty
+        # Fallback to goal_tags if still empty (unfiltered, last resort)
         if not all_candidates:
             cursor = opps_collection.find({"goal_tags": goal}).limit(15)
             async for doc in cursor:

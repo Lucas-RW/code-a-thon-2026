@@ -263,7 +263,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.graphPreviewCard}>
           <View style={styles.graphPreviewHeader}>
-            <Text style={styles.graphPreviewTitle}>Knowledge Graph Preview</Text>
+            <Text style={styles.graphPreviewTitle}>Skills Graph Preview</Text>
             <Text style={styles.graphPreviewMeta}>{graphSize} total connections</Text>
           </View>
           <View style={styles.graphPlaceholder}>
