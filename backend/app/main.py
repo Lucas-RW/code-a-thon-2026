@@ -6,6 +6,7 @@ from pymongo import ReturnDocument
 from datetime import datetime
 from bson import ObjectId
 import logging
+from pathlib import Path
 
 from .db import database
 from .utils import serialize_mongo_document
@@ -22,6 +23,9 @@ from .auth import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ASSETS_DIR = PROJECT_ROOT / "assets"
+
 app = FastAPI(title="CampusLens API")
 
 app.add_middleware(
@@ -32,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
@@ -334,7 +338,8 @@ async def get_interested_opportunities(current_user: dict = Depends(get_current_
             "tags": s_opp.get("tags", []),
             "contact": s_opp.get("contact", None),
             "url": s_opp.get("url", None),
-            "deadline": s_opp.get("deadline", None)
+            "deadline": s_opp.get("deadline", None),
+            "goal_tags": s_opp.get("goal_tags", []),
         })
         
     logger.info(f"Returned {len(results)} interested opportunities for user {current_user['id']}")

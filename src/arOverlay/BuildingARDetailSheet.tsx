@@ -15,19 +15,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 import type { ARBuilding } from './types';
 import { themeColorForBuildingType } from './utils';
 import { shadows, theme } from '@/lib/theme';
-import { fetchBuilding, fetchBuildingOpportunities, Opportunity } from '@/lib/api';
+import {
+  fetchBuilding,
+  fetchBuildingOpportunities,
+  fetchInterestedOpportunities,
+  Opportunity,
+  setOpportunityInterest,
+} from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 interface BuildingARDetailSheetProps {
   building: ARBuilding;
@@ -39,8 +47,12 @@ type TabKey = 'description' | 'professors' | 'opportunities' | 'events' | 'resea
 type BuildingProfessor = {
   id: string;
   name: string;
-  department: string;
-  focus: string;
+  department?: string;
+  title?: string;
+  affiliations?: string;
+  focus?: string;
+  phone?: string;
+  location?: string;
   email?: string;
   linkedin_url?: string;
   image_url?: string;
@@ -59,6 +71,8 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export default function BuildingARDetailSheet({ building, onClose }: BuildingARDetailSheetProps) {
+  const { accessToken } = useAuth();
+  const { showToast } = useToast();
   const translateY = useSharedValue(900);
   const [activeTab, setActiveTab] = useState<TabKey>('description');
   const [interestedMap, setInterestedMap] = useState<Record<string, boolean>>({});
@@ -74,10 +88,14 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
   } | null>(null);
   const [buildingOpportunities, setBuildingOpportunities] = useState<Opportunity[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const sheetTransition = React.useMemo(
+    () => ({ duration: 180, easing: Easing.out(Easing.cubic) }),
+    []
+  );
 
   React.useEffect(() => {
-    translateY.value = withSpring(0, { damping: 20, stiffness: 180 });
-  }, [translateY]);
+    translateY.value = withTiming(0, sheetTransition);
+  }, [sheetTransition, translateY]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -85,14 +103,22 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     async function loadBuildingData() {
       setIsLoadingData(true);
       try {
-        const [detail, opportunities] = await Promise.all([
+        const [detail, opportunities, interested] = await Promise.all([
           fetchBuilding(building.id),
           fetchBuildingOpportunities(building.id),
+          accessToken ? fetchInterestedOpportunities().catch(() => []) : Promise.resolve([]),
         ]);
 
         if (!cancelled) {
           setBuildingDetail(detail);
           setBuildingOpportunities(opportunities);
+          const interestedIds = new Set(interested.map((item) => item.id));
+          setInterestedMap(
+            opportunities.reduce<Record<string, boolean>>((acc, opportunity) => {
+              acc[opportunity.id] = interestedIds.has(opportunity.id);
+              return acc;
+            }, {})
+          );
         }
       } finally {
         if (!cancelled) {
@@ -106,10 +132,10 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     return () => {
       cancelled = true;
     };
-  }, [building.id]);
+  }, [accessToken, building.id]);
 
   const closeSheet = React.useCallback(() => {
-    translateY.value = withTiming(900, { duration: 220 }, (finished) => {
+    translateY.value = withTiming(900, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
       if (finished) runOnJS(onClose)();
     });
   }, [onClose, translateY]);
@@ -122,11 +148,11 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     })
     .onEnd((event) => {
       if (event.translationY > CLOSE_THRESHOLD || event.velocityY > 900) {
-        translateY.value = withTiming(900, { duration: 220 }, (finished) => {
+        translateY.value = withTiming(900, { duration: 180, easing: Easing.in(Easing.cubic) }, (finished) => {
           if (finished) runOnJS(onClose)();
         });
       } else {
-        translateY.value = withSpring(0, { damping: 20, stiffness: 180 });
+        translateY.value = withTiming(0, sheetTransition);
       }
     });
 
@@ -138,8 +164,24 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     opacity: interpolate(translateY.value, [0, 500], [1, 0], Extrapolation.CLAMP),
   }));
 
-  const toggleInterested = (id: string) => {
-    setInterestedMap((current) => ({ ...current, [id]: !current[id] }));
+  const toggleInterested = async (id: string) => {
+    if (!accessToken) {
+      showToast('Log in to save opportunities.', 'error');
+      return;
+    }
+
+    const previous = !!interestedMap[id];
+    const next = !previous;
+    setInterestedMap((current) => ({ ...current, [id]: next }));
+
+    try {
+      await setOpportunityInterest(id, next);
+      showToast(next ? 'Added to interests.' : 'Removed from interests.', next ? 'success' : 'info');
+    } catch (error) {
+      setInterestedMap((current) => ({ ...current, [id]: previous }));
+      const message = error instanceof Error ? error.message : 'Failed to update interest';
+      showToast(message, 'error');
+    }
   };
 
   const toggleExpanded = (id: string) => {
@@ -161,6 +203,12 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
     try {
       await Linking.openURL(url);
     } catch {}
+  };
+
+  const hasValue = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = value.trim();
+    return normalized.length > 0 && normalized.toUpperCase() !== 'TBD';
   };
 
   const renderDescription = () => (
@@ -210,16 +258,16 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             </View>
             <View style={styles.professorTextWrap}>
               <Text style={styles.cardTitle}>{professor.name}</Text>
-              <Text style={styles.cardMeta}>{professor.department}</Text>
+              <Text style={styles.cardMeta}>{professor.title || professor.department || 'Campus contact'}</Text>
             </View>
             </View>
             <View style={styles.professorActionRow}>
-              {professor.linkedin_url ? (
+              {hasValue(professor.linkedin_url) ? (
                 <Pressable style={styles.iconAction} onPress={() => openExternal(professor.linkedin_url!)}>
                   <Ionicons name="logo-linkedin" size={18} color={theme.colors.accentTertiary} />
                 </Pressable>
               ) : null}
-              {professor.email ? (
+              {hasValue(professor.email) ? (
                 <Pressable style={styles.iconAction} onPress={() => openExternal(`mailto:${professor.email}`)}>
                   <Ionicons name="mail-outline" size={18} color={theme.colors.accentTertiary} />
                 </Pressable>
@@ -235,7 +283,36 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
           </View>
           {isExpanded ? (
             <View style={styles.expandedBlock}>
-              <Text style={styles.sectionBody}>{professor.focus}</Text>
+              {hasValue(professor.affiliations || professor.focus) ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Affiliations</Text>
+                  <Text style={styles.detailValue}>{professor.affiliations || professor.focus}</Text>
+                </View>
+              ) : null}
+              {professor.department ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Directory</Text>
+                  <Text style={styles.detailValue}>{professor.department}</Text>
+                </View>
+              ) : null}
+              {professor.location ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Location</Text>
+                  <Text style={styles.detailValue}>{professor.location}</Text>
+                </View>
+              ) : null}
+              {professor.phone ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Phone</Text>
+                  <Text style={styles.detailValue}>{professor.phone}</Text>
+                </View>
+              ) : null}
+              {hasValue(professor.email) ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue}>{professor.email}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -282,22 +359,114 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             {isExpanded ? (
               <View style={styles.expandedBlock}>
                 <Text style={styles.sectionBody}>{item.description || 'Additional details coming soon.'}</Text>
+                {item.hosted_by ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Hosted by</Text>
+                    <Text style={styles.detailValue}>{item.hosted_by}</Text>
+                  </View>
+                ) : null}
+                {item.location_detail ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Location</Text>
+                    <Text style={styles.detailValue}>{item.location_detail}</Text>
+                  </View>
+                ) : null}
+                {item.department ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Department</Text>
+                    <Text style={styles.detailValue}>{item.department}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Hourly commitment</Text>
+                  <Text style={styles.detailLabel}>{item.type === 'event' ? 'Time' : 'Hourly commitment'}</Text>
                   <Text style={styles.detailValue}>{item.hourly_commitment || 'TBD'}</Text>
                 </View>
+                {item.terms_available ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Terms available</Text>
+                    <Text style={styles.detailValue}>{item.terms_available}</Text>
+                  </View>
+                ) : null}
+                {item.student_level ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Student level</Text>
+                    <Text style={styles.detailValue}>{item.student_level}</Text>
+                  </View>
+                ) : null}
+                {item.credit ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Credit</Text>
+                    <Text style={styles.detailValue}>{item.credit}</Text>
+                  </View>
+                ) : null}
                 {item.pay ? (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Potential pay</Text>
                     <Text style={styles.detailValue}>{item.pay}</Text>
                   </View>
                 ) : null}
-                {item.professor ? (
+                {item.stipend ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Stipend</Text>
+                    <Text style={styles.detailValue}>{item.stipend}</Text>
+                  </View>
+                ) : null}
+                {item.deadline ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{item.type === 'event' ? 'Date' : 'Application deadline'}</Text>
+                    <Text style={styles.detailValue}>{item.deadline}</Text>
+                  </View>
+                ) : null}
+                {item.professor ? item.professor_id ? (
                   <Pressable style={styles.detailRow} onPress={() => openProfessor(item.professor_id)}>
                     <Text style={styles.detailLabel}>Professor associated</Text>
                     <View style={styles.professorLink}>
                       <Text style={styles.professorLinkText}>{item.professor}</Text>
                       <Ionicons name="arrow-forward" size={14} color={theme.colors.accentTertiary} />
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Professor associated</Text>
+                    <Text style={styles.detailValue}>{item.professor}</Text>
+                  </View>
+                ) : null}
+                {item.contact ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Contact</Text>
+                    <Text style={styles.detailValue}>{item.contact}</Text>
+                  </View>
+                ) : null}
+                {item.phd_student_mentors ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Ph.D. mentor(s)</Text>
+                    <Text style={styles.detailValue}>{item.phd_student_mentors}</Text>
+                  </View>
+                ) : null}
+                {item.prerequisites ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Prerequisites</Text>
+                    <Text style={styles.detailValue}>{item.prerequisites}</Text>
+                  </View>
+                ) : null}
+                {item.application_requirements ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Application requirements</Text>
+                    <Text style={styles.detailValue}>{item.application_requirements}</Text>
+                  </View>
+                ) : null}
+                {item.next_steps ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Next steps</Text>
+                    <Text style={styles.detailValue}>{item.next_steps}</Text>
+                  </View>
+                ) : null}
+                {item.url ? (
+                  <Pressable style={styles.detailRow} onPress={() => openExternal(item.url!)}>
+                    <Text style={styles.detailLabel}>Website</Text>
+                    <View style={styles.professorLink}>
+                      <Text style={styles.professorLinkText}>Open link</Text>
+                      <Ionicons name="open-outline" size={14} color={theme.colors.accentTertiary} />
                     </View>
                   </Pressable>
                 ) : null}
@@ -338,10 +507,6 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
       </Animated.View>
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.sheet, sheetStyle]}>
-          <View style={styles.handleWrap}>
-            <View style={styles.handle} />
-          </View>
-
           <ScrollView
             bounces={false}
             showsVerticalScrollIndicator={false}
@@ -351,6 +516,9 @@ export default function BuildingARDetailSheet({ building, onClose }: BuildingARD
             <View>
               <ImageBackground source={{ uri: buildingDetail?.image_url || building.image_url || HERO_PLACEHOLDER }} style={styles.hero} imageStyle={styles.heroImage}>
                 <LinearGradient colors={['rgba(11,11,15,0.08)', 'rgba(11,11,15,0.92)']} style={styles.heroOverlay}>
+                  <View style={styles.handleWrap}>
+                    <View style={styles.handle} />
+                  </View>
                   <View style={styles.heroTopRow}>
                     <View style={[styles.heroBadge, { backgroundColor: `${accentColor}33` }]}>
                       <Ionicons name="business-outline" size={16} color={theme.colors.textOnAccent} />
@@ -430,18 +598,17 @@ const styles = StyleSheet.create({
   },
   handleWrap: {
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
-    backgroundColor: theme.colors.backgroundPrimary,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   handle: {
     width: 42,
     height: 5,
     borderRadius: 999,
-    backgroundColor: theme.colors.whiteSoft,
+    backgroundColor: 'rgba(255,255,255,0.42)',
   },
   scrollContent: {
-    paddingBottom: 36,
+    paddingBottom: 96,
   },
   hero: {
     height: 250,
@@ -455,6 +622,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     padding: 18,
+    paddingTop: 10,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -530,6 +698,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     paddingHorizontal: 18,
     paddingTop: 18,
+    paddingBottom: 40,
   },
   panelStack: {
     gap: 14,

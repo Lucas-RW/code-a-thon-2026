@@ -1,22 +1,39 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { fetchBuildings, fetchInterestedOpportunities, BuildingSummary, InterestedOpportunity } from '@/lib/api';
+import {
+  fetchBuildings,
+  fetchBuildingOpportunities,
+  fetchInterestedOpportunities,
+  BuildingSummary,
+  InterestedOpportunity,
+  GoalType,
+  Opportunity,
+} from '@/lib/api';
 import LoadingState from '@/components/LoadingState';
-import VoyagerOverlay from '@/components/VoyagerOverlay';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { shadows, theme } from '@/lib/theme';
+import BuildingARDetailSheet from '@/src/arOverlay/BuildingARDetailSheet';
+import type { ARBuilding } from '@/src/arOverlay/types';
 
 type FeedItem = {
   id: string;
   title: string;
   subtitle: string;
   meta: string;
+  opportunityId: string;
   buildingId: string;
   buildingShortName?: string;
+};
+
+type ActivityItem = {
+  id: string;
+  label: string;
+  meta: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
 };
 
 function getInitials(label: string) {
@@ -27,14 +44,53 @@ function getInitials(label: string) {
     .join('');
 }
 
+function formatGoalLabel(goal: GoalType) {
+  return goal.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toARBuilding(building: BuildingSummary, opportunityCount: number): ARBuilding {
+  const departments = building.departments ?? [];
+  const lowered = departments.map((department) => department.toLowerCase());
+
+  const buildingType = lowered.some((department) =>
+    ['student', 'community', 'campus', 'organization'].some((keyword) => department.includes(keyword))
+  )
+    ? 'student_life'
+    : lowered.some((department) =>
+        ['physics', 'science', 'astronomy', 'biology', 'chemistry', 'research'].some((keyword) => department.includes(keyword))
+      )
+      ? 'science'
+      : 'engineering';
+
+  return {
+    id: building.id,
+    name: building.name,
+    lat: building.lat,
+    lng: building.lng,
+    screenX: 0.5,
+    screenY: 0.5,
+    distanceMeters: 0,
+    opportunityCount,
+    buildingType,
+    inView: true,
+    description: building.description,
+    image_url: building.image_url,
+  };
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { showToast } = useToast();
   const { userProfile } = useAuth();
   const [buildings, setBuildings] = React.useState<BuildingSummary[]>([]);
   const [interests, setInterests] = React.useState<InterestedOpportunity[]>([]);
+  const [allOpportunities, setAllOpportunities] = React.useState<(Opportunity & {
+    building_name: string;
+    building_short_name?: string;
+  })[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [voyagerBuilding, setVoyagerBuilding] = React.useState<BuildingSummary | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = React.useState<ARBuilding | null>(null);
+  const [showAllActivity, setShowAllActivity] = React.useState(false);
 
   const loadHome = React.useCallback(async () => {
     setIsLoading(true);
@@ -43,8 +99,19 @@ export default function HomeScreen() {
         fetchBuildings(),
         fetchInterestedOpportunities().catch(() => [] as InterestedOpportunity[]),
       ]);
+      const opportunityGroups = await Promise.all(
+        buildingData.map(async (building) => {
+          const buildingOpportunities = await fetchBuildingOpportunities(building.id);
+          return buildingOpportunities.map((opportunity) => ({
+            ...opportunity,
+            building_name: building.name,
+            building_short_name: building.short_name,
+          }));
+        })
+      );
       setBuildings(buildingData);
       setInterests(interestData);
+      setAllOpportunities(opportunityGroups.flat());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       showToast(msg, 'error');
@@ -74,70 +141,84 @@ export default function HomeScreen() {
   }, [buildingLookup, buildings, interests]);
 
   const featuredOpportunity = interests[0] ?? null;
+  const opportunityCountByBuilding = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    interests.forEach((item) => {
+      counts.set(item.building_id, (counts.get(item.building_id) ?? 0) + 1);
+    });
+    return counts;
+  }, [interests]);
 
-  const recentActivity = React.useMemo(
-    () => [
-      {
-        id: 'interests',
-        label: 'Saved',
-        value: String(interests.length),
-        icon: 'bookmark',
-      },
-      {
-        id: 'goals',
-        label: 'Goals',
-        value: String(userProfile?.goals.length ?? 0),
+  const activityHistory = React.useMemo<ActivityItem[]>(() => {
+    const timeline: ActivityItem[] = [];
+
+    if (userProfile?.major) {
+      timeline.push({
+        id: 'major',
+        label: `Set your academic path around ${userProfile.major}`,
+        meta: userProfile.year ? `${userProfile.year}` : 'Profile milestone',
+        icon: 'school',
+      });
+    }
+
+    (userProfile?.goals ?? []).slice(0, 2).forEach((goal) => {
+      timeline.push({
+        id: `goal-${goal}`,
+        label: `Focused your journey on ${formatGoalLabel(goal)}`,
+        meta: 'Goal preference updated',
         icon: 'track-changes',
-      },
+      });
+    });
+
+    interests.slice(0, 3).forEach((item) => {
+      timeline.push({
+        id: item.id,
+        label: `Marked ${item.title} as interested`,
+        meta: item.building_name,
+        icon: 'bookmark-border',
+      });
+    });
+
+    if (timeline.length > 0) {
+      return timeline;
+    }
+
+    return [
       {
-        id: 'next',
-        label: 'Next Step',
-        value: featuredOpportunity ? 'Ready' : 'Explore',
+        id: 'empty-activity',
+        label: 'Explore buildings to start shaping your path',
+        meta: 'Recent movement will appear here',
         icon: 'auto-awesome',
       },
-    ],
-    [featuredOpportunity, interests.length, userProfile?.goals.length]
+    ];
+  }, [interests, userProfile]);
+
+  const visibleActivity = React.useMemo(
+    () => (showAllActivity ? activityHistory : activityHistory.slice(0, 5)),
+    [activityHistory, showAllActivity]
   );
 
   const feedItems = React.useMemo<FeedItem[]>(() => {
-    const items = interests.slice(0, 5).map((item) => ({
+    if (allOpportunities.length === 0) {
+      return [];
+    }
+
+    const shuffled = [...allOpportunities];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return shuffled.slice(0, 3).map((item) => ({
       id: item.id,
+      opportunityId: item.id,
       title: item.title,
-      subtitle:
-        item.type === 'research'
-          ? 'A professor in your orbit has a research opening.'
-          : item.type === 'event'
-            ? 'A campus event connected to your interests is coming up.'
-            : 'A new opportunity matches the direction of your graph.',
+      subtitle: item.summary || item.description || 'Explore this opportunity and see how it fits your path.',
       meta: item.building_name,
       buildingId: item.building_id,
       buildingShortName: item.building_short_name,
     }));
-
-    if (items.length > 0) {
-      return items;
-    }
-
-    return buildings.slice(0, 3).map((building, index) => ({
-      id: building.id,
-      title: `${building.name} has new pathways to explore`,
-      subtitle: 'Jump back into a relevant location and see what opportunities are nearby.',
-      meta: index === 0 ? 'Suggested next move' : 'Recommended building',
-      buildingId: building.id,
-      buildingShortName: building.short_name,
-    }));
-  }, [buildings, interests]);
-
-  const openBuilding = (building: BuildingSummary | { id: string; name?: string; short_name?: string }) => {
-    router.push({
-      pathname: '/building/[id]',
-      params: {
-        id: building.id,
-        name: building.name ?? 'Building',
-        short_name: building.short_name || '',
-      },
-    });
-  };
+  }, [allOpportunities]);
 
   if (isLoading && buildings.length === 0) {
     return <LoadingState message="Loading your command center..." />;
@@ -169,10 +250,20 @@ export default function HomeScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.buildingRail}>
           {personalizedBuildings.map((building) => (
-            <TouchableOpacity key={building.id} style={styles.buildingPill} onPress={() => openBuilding(building)}>
-              <LinearGradient colors={[...theme.gradients.panelGlow]} style={styles.buildingAvatar}>
-                <Text style={styles.buildingAvatarText}>{getInitials(building.short_name || building.name)}</Text>
-              </LinearGradient>
+            <TouchableOpacity
+              key={building.id}
+              style={styles.buildingPill}
+              onPress={() => setSelectedBuilding(toARBuilding(building, opportunityCountByBuilding.get(building.id) ?? 0))}
+            >
+              {building.image_url ? (
+                <View style={styles.buildingAvatarFrame}>
+                  <Image source={{ uri: building.image_url }} style={styles.buildingAvatarImage} />
+                </View>
+              ) : (
+                <LinearGradient colors={[...theme.gradients.panelGlow]} style={styles.buildingAvatar}>
+                  <Text style={styles.buildingAvatarText}>{getInitials(building.short_name || building.name)}</Text>
+                </LinearGradient>
+              )}
               <Text style={styles.buildingLabel} numberOfLines={1}>
                 {building.short_name || building.name}
               </Text>
@@ -181,15 +272,25 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <Text style={styles.sectionHint}>Your momentum</Text>
+          <Text style={styles.sectionTitle}>Activity History</Text>
+          {activityHistory.length > 5 ? (
+            <TouchableOpacity onPress={() => setShowAllActivity((current) => !current)}>
+              <Text style={styles.sectionAction}>{showAllActivity ? 'Show less' : 'Show all'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.sectionHint}>Your momentum</Text>
+          )}
         </View>
-        <View style={styles.activityRow}>
-          {recentActivity.map((item) => (
-            <View key={item.id} style={styles.activityCard}>
-              <MaterialIcons name={item.icon as any} size={18} color={theme.colors.accentTertiary} />
-              <Text style={styles.activityValue}>{item.value}</Text>
-              <Text style={styles.activityLabel}>{item.label}</Text>
+        <View style={styles.activityHistoryCard}>
+          {visibleActivity.map((item, index) => (
+            <View key={item.id} style={[styles.timelineRow, index === visibleActivity.length - 1 && styles.timelineRowLast]}>
+              <View style={styles.timelineIcon}>
+                <MaterialIcons name={item.icon} size={16} color={theme.colors.accentTertiary} />
+              </View>
+              <View style={styles.timelineBody}>
+                <Text style={styles.timelineLabel}>{item.label}</Text>
+                <Text style={styles.timelineMeta}>{item.meta}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -217,43 +318,26 @@ export default function HomeScreen() {
               {featuredOpportunity?.building_name || personalizedBuildings[0]?.name || 'Campus-wide'}
             </Text>
           </View>
-          <View style={styles.heroActions}>
-            <TouchableOpacity
-              style={styles.heroPrimaryButton}
-              onPress={() =>
-                featuredOpportunity
-                  ? openBuilding({
-                      id: featuredOpportunity.building_id,
-                      name: featuredOpportunity.building_name,
-                      short_name: featuredOpportunity.building_short_name,
-                    })
-                  : personalizedBuildings[0] && openBuilding(personalizedBuildings[0])
-              }
-            >
-              <Text style={styles.heroPrimaryText}>View</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroSecondaryButton} onPress={() => router.push('/my-opportunities')}>
-              <Text style={styles.heroSecondaryText}>Interested</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.learnMoreButton}
+            onPress={() =>
+              featuredOpportunity
+                ? router.push({
+                    pathname: '/my-opportunities',
+                    params: { opportunityId: featuredOpportunity.id },
+                  })
+                : router.push('/my-opportunities')
+            }
+          >
+            <Text style={styles.learnMoreText}>Learn more</Text>
+          </TouchableOpacity>
         </LinearGradient>
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>From Your Network</Text>
-          <Text style={styles.sectionHint}>Graph-based updates</Text>
         </View>
         {feedItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.feedCard}
-            onPress={() =>
-              openBuilding({
-                id: item.buildingId,
-                name: item.meta,
-                short_name: item.buildingShortName,
-              })
-            }
-          >
+          <View key={item.id} style={styles.feedCard}>
             <View style={styles.feedIcon}>
               <MaterialIcons name="hub" size={18} color={theme.colors.accentTertiary} />
             </View>
@@ -262,23 +346,25 @@ export default function HomeScreen() {
               <Text style={styles.feedSubtitle}>{item.subtitle}</Text>
               <Text style={styles.feedMeta}>{item.meta}</Text>
             </View>
-            <TouchableOpacity 
-              onPress={() => {
-                const b = buildings.find(b => b.id === item.buildingId);
-                if (b) setVoyagerBuilding(b);
-              }}
-              style={styles.voyagerTrigger}
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/my-opportunities',
+                  params: { opportunityId: item.opportunityId },
+                })
+              }
+              style={styles.feedArrowTrigger}
             >
-              <MaterialIcons name="auto-fix-high" size={20} color={theme.colors.accentTertiary} />
+              <MaterialIcons name="arrow-forward-ios" size={16} color={theme.colors.accentTertiary} />
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
 
-      {voyagerBuilding && (
-        <VoyagerOverlay 
-          building={voyagerBuilding}
-          onClose={() => setVoyagerBuilding(null)}
+      {selectedBuilding && (
+        <BuildingARDetailSheet
+          building={selectedBuilding}
+          onClose={() => setSelectedBuilding(null)}
         />
       )}
     </SafeAreaView>
@@ -340,6 +426,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  sectionAction: {
+    color: theme.colors.accentTertiary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   buildingRail: {
     paddingBottom: 10,
     gap: 14,
@@ -359,6 +450,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.whiteSoft,
     marginBottom: 10,
   },
+  buildingAvatarFrame: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginBottom: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.whiteSoft,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  buildingAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
   buildingAvatarText: {
     color: theme.colors.textPrimary,
     fontSize: 18,
@@ -370,36 +475,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  activityRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-  },
-  activityCard: {
-    flex: 1,
+  activityHistoryCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 16,
+    padding: 18,
+    marginBottom: 28,
     ...shadows.card,
   },
-  activityValue: {
-    color: theme.colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 12,
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  activityLabel: {
+  timelineRowLast: {
+    marginBottom: 0,
+    paddingBottom: 0,
+    borderBottomWidth: 0,
+  },
+  timelineIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  timelineBody: {
+    flex: 1,
+  },
+  timelineLabel: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  timelineMeta: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   heroCard: {
     borderRadius: 26,
     padding: 22,
+    paddingBottom: 18,
     marginBottom: 28,
     ...shadows.glow,
   },
@@ -441,33 +567,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  heroActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  heroPrimaryButton: {
-    backgroundColor: theme.colors.textOnAccent,
-    borderRadius: 14,
+  learnMoreButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
     paddingHorizontal: 18,
     paddingVertical: 12,
-  },
-  heroPrimaryText: {
-    color: theme.colors.backgroundPrimary,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  heroSecondaryButton: {
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.26)',
   },
-  heroSecondaryText: {
+  learnMoreText: {
     color: theme.colors.textOnAccent,
-    fontWeight: '700',
     fontSize: 14,
+    fontWeight: '700',
   },
   feedCard: {
     flexDirection: 'row',
@@ -512,7 +625,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  voyagerTrigger: {
+  feedArrowTrigger: {
     width: 40,
     height: 40,
     borderRadius: 20,

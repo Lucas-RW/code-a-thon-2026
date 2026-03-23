@@ -219,8 +219,6 @@
     }
 
     function populateFromPath(path, alternatives = []) {
-        if (!path || path.length === 0) return;
-
         const networkNodes = [];
         const networkLinks = [];
         const nodeSet = new Set();
@@ -306,6 +304,52 @@
         networkSimulation = initGraph("#network-graph", { nodes: networkNodes, links: networkLinks });
     }
 
+    function populateDefaultGraph() {
+        const defaultPath = [
+            {
+                opportunity_id: "starter_club",
+                opportunity_title: "Join a Career Club",
+                building_id: "student_union",
+                building_name: "Student Union",
+                short_reason: "Start by meeting peers, learning the campus ecosystem, and finding recurring events.",
+                skills: ["Networking", "Communication"],
+                order: 1
+            },
+            {
+                opportunity_id: "starter_project",
+                opportunity_title: "Build a Personal Project",
+                building_id: "innovation_lab",
+                building_name: "Innovation Lab",
+                short_reason: "Create something tangible that shows initiative and gives you stories to share.",
+                skills: ["Problem Solving", "Project Planning"],
+                order: 2
+            },
+            {
+                opportunity_id: "starter_internship",
+                opportunity_title: "Apply for an Internship",
+                building_id: "career_center",
+                building_name: "Career Center",
+                short_reason: "Use your project work and campus network to pursue a concrete next step.",
+                skills: ["Interviewing", "Professional Growth"],
+                order: 3
+            }
+        ];
+
+        const defaultAlternatives = [
+            {
+                opportunity_id: "starter_research",
+                opportunity_title: "Join a Research Group",
+                building_id: "research_hall",
+                building_name: "Research Hall",
+                short_reason: "A strong alternate route if you want deeper technical mentorship and hands-on experience.",
+                skills: ["Research", "Critical Thinking"],
+                order: 2
+            }
+        ];
+
+        populateFromPath(defaultPath, defaultAlternatives);
+    }
+
     function handleMessage(event) {
         let payload;
         try {
@@ -315,10 +359,15 @@
         }
 
         if (payload.type === "UPDATE_DATA") {
-            populateFromPath(payload.path, payload.alternatives);
+            if (payload.path && payload.path.length > 0) {
+                populateFromPath(payload.path, payload.alternatives);
+            } else {
+                populateDefaultGraph();
+            }
         }
     }
 
     window.addEventListener("message", handleMessage);
     document.addEventListener("message", handleMessage);
+    populateDefaultGraph();
 })();

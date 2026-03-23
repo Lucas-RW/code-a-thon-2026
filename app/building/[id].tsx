@@ -317,7 +317,7 @@ export default function BuildingDetailScreen() {
               style={[styles.goalChip, selectedGoal === "all" && styles.activeGoalChip]}
               onPress={() => handleGoalChange("all")}
             >
-              <Text style={[styles.goalChipText, selectedGoal === "all" && styles.activeGoalChipText]}>All Goals</Text>
+              <Text style={[styles.goalChipText, selectedGoal === "all" && styles.activeGoalChipText]}>All Opportunities</Text>
             </TouchableOpacity>
             {GOAL_OPTIONS.map((goal) => (
               <TouchableOpacity 

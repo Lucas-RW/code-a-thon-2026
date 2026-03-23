@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Text, StyleSheet, TouchableOpacity, Animated, Platform, View } from 'react-native';
 import { shadows, theme } from '@/lib/theme';
 
 interface ToastProps {
@@ -43,26 +42,16 @@ export default function Toast({ message, type = 'error', visible, onHide }: Toas
     });
   };
 
-  const gradientColors: [string, string, ...string[]] =
-    type === 'error'
-      ? [theme.colors.dangerSurface, '#7F1D1D']
-      : type === 'success'
-        ? ['#123524', '#166534']
-        : [...theme.gradients.accent];
+  const backgroundColor = type === 'error' ? '#FF3B30' : '#22C55E';
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
-      <LinearGradient
-        colors={gradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
+      <View style={[styles.toast, { backgroundColor }]}>
         <Text style={styles.message}>{message}</Text>
       <TouchableOpacity onPress={hide} style={styles.closeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <Text style={styles.closeText}>×</Text>
       </TouchableOpacity>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 }
@@ -78,7 +67,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.glow,
   },
-  gradient: {
+  toast: {
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',

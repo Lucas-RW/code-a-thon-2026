@@ -1,6 +1,5 @@
 import * as React from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Pressable,
   SafeAreaView,
@@ -14,12 +13,9 @@ import {
 import { useToast } from '@/context/ToastContext';
 import { useGraph } from '@/context/GraphContext';
 import { useAuth } from '@/context/AuthContext';
-import SkillTree from '@/components/SkillTree';
 import SimpleWebView from '@/components/SimpleWebView';
 import { fetchPathfind, GoalType, PathStep } from '@/lib/api';
 import { shadows, theme } from '@/lib/theme';
-
-type GraphMode = 'skills' | 'network';
 
 const SUGGESTED_PROMPTS = [
   'How do I become a software engineer?',
@@ -33,7 +29,6 @@ export default function GoldenPathScreen() {
   const { pathData, setPathData, setGlobalGoalText } = useGraph();
   const [alternatives, setAlternatives] = React.useState<PathStep[]>([]);
   const [query, setQuery] = React.useState('');
-  const [graphMode, setGraphMode] = React.useState<'skills' | 'network'>('network');
   const [selectedNodeIds, setSelectedNodeIds] = React.useState<Set<string>>(new Set());
 
   // Initialize all nodes as selected when path changes
@@ -63,8 +58,6 @@ export default function GoldenPathScreen() {
       console.error('Error parsing graph message', e);
     }
   };
-  const [isGenerating, setIsGenerating] = React.useState(false);
-
   const submitPrompt = React.useCallback(async () => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
@@ -72,7 +65,6 @@ export default function GoldenPathScreen() {
       return;
     }
 
-    setIsGenerating(true);
     try {
       // For now, we'll use the first goal of the user or 'career' as default
       const goalType = (userProfile?.goals[0] as GoalType) || 'career';
@@ -96,8 +88,6 @@ export default function GoldenPathScreen() {
       } else {
         showToast('Failed to generate path. Please try again.', 'error');
       }
-    } finally {
-      setIsGenerating(false);
     }
   }, [query, showToast, userProfile, setPathData, setGlobalGoalText]);
 
@@ -105,38 +95,6 @@ export default function GoldenPathScreen() {
     const generic = ['professional', 'networking', 'career', 'teamwork', 'leadership', 'communication', 'interpersonal', 'soft skills'];
     return generic.includes(skill.toLowerCase());
   };
-
-  const acquiredSkills = React.useMemo(() => {
-    if (!userProfile) return ['Data Structures', 'Git Version Control', 'Statistical Analysis'];
-    
-    // Extract skills from goals and profile
-    const goalSkills = userProfile.goals.flatMap(g => {
-      if (g === 'career') return ['Software Engineering', 'System Design'];
-      if (g === 'research') return ['Python', 'Data Science', 'Machine Learning'];
-      return [];
-    });
-    
-    // Simple filter to keep it relevant to query if possible
-    const allAcquired = Array.from(new Set([...goalSkills, 'Git', 'Data Structures']));
-    const q = query.toLowerCase();
-    
-    // Sort by relevance to query
-    return allAcquired
-      .filter(s => !isGenericSkill(s))
-      .sort((a, b) => {
-        const aMatch = q.includes(a.toLowerCase());
-        const bMatch = q.includes(b.toLowerCase());
-        if (aMatch && !bMatch) return -1;
-        if (!aMatch && bMatch) return 1;
-        return 0;
-      })
-      .slice(0, 6);
-  }, [userProfile, query]);
-
-  const plannedSkills = React.useMemo(() => {
-    const allSkills = pathData.flatMap(step => step.skills || []);
-    return Array.from(new Set(allSkills)).filter(s => !isGenericSkill(s));
-  }, [pathData]);
 
   const uniquePathData = React.useMemo(() => {
     const seen = new Set();
@@ -152,7 +110,7 @@ export default function GoldenPathScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
         <View style={styles.header}>
-          <Text style={styles.title}>Growth Graph</Text>
+          <Text style={styles.title}>Connection Graph</Text>
           <Text style={styles.subtitle}>
             Explore how skills, professors, clubs, and opportunities connect.
           </Text>
@@ -195,20 +153,12 @@ export default function GoldenPathScreen() {
 
         <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
           <View style={styles.canvasArea}>
-            {graphMode === 'skills' ? (
-              <SkillTree 
-                acquiredSkills={acquiredSkills} 
-                plannedSkills={plannedSkills}
-                acquiredOnly={false}
-              />
-            ) : (
-              <SimpleWebView 
-                source={{ uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/assets/graph/index.html` }}
-                path={pathData}
-                alternatives={alternatives}
-                onMessage={onGraphMessage}
-              />
-            )}
+            <SimpleWebView 
+              source={{ uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/assets/graph/index.html` }}
+              path={pathData}
+              alternatives={alternatives}
+              onMessage={onGraphMessage}
+            />
           </View>
 
           {(uniquePathData.length > 0 || alternatives.length > 0) && (
@@ -257,44 +207,6 @@ export default function GoldenPathScreen() {
           )}
         </ScrollView>
 
-        <View style={styles.toggleDock}>
-          <View style={styles.toggleTrack}>
-            {[
-              { key: 'skills' as const, label: 'Skills Map' },
-              { key: 'network' as const, label: 'Network Map' },
-            ].map((option) => {
-              const isActive = graphMode === option.key;
-
-              if (isActive) {
-                return (
-                  <React.Fragment key={option.key}>
-                    <LinearGradient
-                      colors={theme.gradients.accent}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.activeToggle}
-                    >
-                      <Pressable onPress={() => setGraphMode(option.key)} style={styles.toggleButton}>
-                        <Text style={styles.activeToggleText}>{option.label}</Text>
-                      </Pressable>
-                    </LinearGradient>
-                  </React.Fragment>
-                );
-              }
-
-              return (
-                <React.Fragment key={option.key}>
-                  <Pressable
-                    onPress={() => setGraphMode(option.key)}
-                    style={styles.inactiveToggle}
-                  >
-                    <Text style={styles.inactiveToggleText}>{option.label}</Text>
-                  </Pressable>
-                </React.Fragment>
-              );
-            })}
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -310,7 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundPrimary,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 112,
+    paddingBottom: 20,
   },
   header: {
     marginBottom: 28,
@@ -469,49 +381,6 @@ const styles = StyleSheet.create({
   skillBadgeText: {
     color: theme.colors.textMuted,
     fontSize: 10,
-    fontWeight: '700',
-  },
-  toggleDock: {
-    marginTop: 0,
-    marginBottom: 10,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...shadows.card,
-  },
-  toggleTrack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  activeToggle: {
-    flex: 1,
-    borderRadius: theme.radius.pill,
-    padding: 1,
-    ...shadows.glow,
-  },
-  toggleButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.pill,
-    minHeight: 42,
-  },
-  activeToggleText: {
-    color: theme.colors.textOnAccent,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  inactiveToggle: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: theme.radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  inactiveToggleText: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
     fontWeight: '700',
   },
 });

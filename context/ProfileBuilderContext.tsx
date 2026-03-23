@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { UserProfile } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 export interface ProfileData {
   name: string;
@@ -37,8 +39,8 @@ interface ProfileBuilderContextType {
 
 const ProfileBuilderContext = createContext<ProfileBuilderContextType | undefined>(undefined);
 
-export function ProfileBuilderProvider({ children }: { children: React.ReactNode }) {
-  const [profileData, setProfileData] = useState<ProfileData>({
+function createEmptyProfileData(): ProfileData {
+  return {
     name: '',
     year: '',
     major: '',
@@ -46,7 +48,32 @@ export function ProfileBuilderProvider({ children }: { children: React.ReactNode
     is_transfer: false,
     goals: [],
     goal_preferences: {},
-  });
+  };
+}
+
+function createProfileDataFromUser(profile: UserProfile | null): ProfileData {
+  if (!profile) {
+    return createEmptyProfileData();
+  }
+
+  return {
+    name: profile.name ?? '',
+    year: profile.year ?? '',
+    major: profile.major ?? '',
+    is_first_gen: profile.is_first_gen ?? false,
+    is_transfer: profile.is_transfer ?? false,
+    goals: profile.goals ?? [],
+    goal_preferences: profile.goal_preferences ?? {},
+  };
+}
+
+export function ProfileBuilderProvider({ children }: { children: React.ReactNode }) {
+  const { userProfile } = useAuth();
+  const [profileData, setProfileData] = useState<ProfileData>(() => createProfileDataFromUser(userProfile));
+
+  useEffect(() => {
+    setProfileData(createProfileDataFromUser(userProfile));
+  }, [userProfile]);
 
   const updateProfileData = (data: Partial<ProfileData>) => {
     setProfileData((prev) => ({ ...prev, ...data }));
